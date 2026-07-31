@@ -1,0 +1,11 @@
+[Unit]
+Description=Check every two minutes for a CI-approved Top AI Repos release
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=10s
+Unit=top-ai-repos-deploy.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,116 @@
+# VPS deployment
+
+This directory installs a pull-based deployment on an Ubuntu VPS. Every two
+minutes the server fetches public `origin/main`, checks the public GitHub Actions
+API for a successful **push** run of `.github/workflows/ci.yml` at that exact
+commit, and only then builds and activates it. Git uses public HTTPS; the server
+needs no GitHub SSH key, deploy key, webhook, or repository secret.
+
+Releases live at `/srv/top-ai-repos/releases/<40-character-sha>`. The deployer
+builds as the unprivileged `topairepos-deploy` user, while the web process runs
+under the separate `topairepos` account. It runs migrations and the idempotent
+taxonomy seed, atomically changes `/srv/top-ai-repos/current`, restarts the app,
+and checks `/api/health` with `/api/stats` as a compatibility fallback. A failed
+health check restores the previous code symlink. Database migrations are not
+reversed, so migrations merged to `main` must remain backward-compatible with
+the immediately preceding release. The three newest releases are retained.
+
+## 1. DNS and prerequisites
+
+Point these records at the VPS before requesting certificates:
+
+| Name | Type | Value |
+| --- | --- | --- |
+| `topairepos.com` | `A` | `62.238.43.103` |
+| `www.topairepos.com` | `A` | `62.238.43.103` |
+| `aireporank.com` | `A` | `62.238.43.103` |
+| `www.aireporank.com` | `A` | `62.238.43.103` |
+| `airepolist.com` | `A` | `62.238.43.103` |
+| `www.airepolist.com` | `A` | `62.238.43.103` |
+
+Open TCP ports 80 and 443. Install system-wide Node.js 22.6 or newer so both
+`/usr/bin/node` and `/usr/bin/npm` exist, then install the remaining packages:
+
+```bash
+sudo apt update
+sudo apt install -y git curl jq nginx certbot python3-certbot-nginx
+/usr/bin/node --version
+/usr/bin/npm --version
+```
+
+On a small VPS, provision swap before enabling server-side builds. This host
+uses a 2 GiB `/swapfile` managed by `deploy/swapfile.swap`.
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 0600 /swapfile
+sudo mkswap /swapfile
+```
+
+## 2. Install the service
+
+Run these commands from the repository checkout:
+
+```bash
+sudo useradd --system --user-group --home-dir /srv/top-ai-repos \
+  --shell /usr/sbin/nologin topairepos
+sudo useradd --system --user-group --home-dir /var/lib/topairepos-deploy \
+  --shell /usr/sbin/nologin topairepos-deploy
+sudo usermod --append --groups topairepos topairepos-deploy
+sudo install -d -o root -g root -m 0755 /srv/top-ai-repos
+sudo install -d -o root -g topairepos -m 0750 /srv/top-ai-repos/shared
+sudo install -o root -g topairepos -m 0640 .env /srv/top-ai-repos/shared/.env
+
+sudo install -o root -g root -m 0755 deploy/deploy.sh \
+  /usr/local/sbin/top-ai-repos-deploy
+sudo install -o root -g root -m 0644 deploy/top-ai-repos.service \
+  /etc/systemd/system/top-ai-repos.service
+sudo install -o root -g root -m 0644 deploy/top-ai-repos-deploy.service \
+  /etc/systemd/system/top-ai-repos-deploy.service
+sudo install -o root -g root -m 0644 deploy/top-ai-repos-deploy.timer \
+  /etc/systemd/system/top-ai-repos-deploy.timer
+sudo install -o root -g root -m 0644 deploy/swapfile.swap \
+  /etc/systemd/system/swapfile.swap
+sudo install -o root -g root -m 0644 deploy/nginx.conf \
+  /etc/nginx/sites-available/top-ai-repos.conf
+sudo ln -s /etc/nginx/sites-available/top-ai-repos.conf \
+  /etc/nginx/sites-enabled/top-ai-repos.conf
+sudo nginx -t
+sudo systemctl daemon-reload
+sudo systemctl enable --now swapfile.swap
+sudo systemctl enable top-ai-repos.service top-ai-repos-deploy.timer nginx
+sudo systemctl restart nginx
+sudo systemctl start top-ai-repos-deploy.service
+sudo systemctl start top-ai-repos-deploy.timer
+```
+
+If either service account already exists, skip its `useradd`. Ensure the shared
+`.env` has at least `DATABASE_URL`, `GITHUB_TOKEN`, and
+`NEXT_PUBLIC_SITE_URL=https://topairepos.com`. The application token reads
+public repository data; it is unrelated to deployment and is never used to pull
+code or query the CI gate.
+
+The first deploy may take several minutes. Check it with:
+
+```bash
+sudo systemctl status top-ai-repos.service top-ai-repos-deploy.timer
+sudo journalctl -u top-ai-repos-deploy.service -u top-ai-repos.service -n 200
+curl --fail http://127.0.0.1:3002/api/health || \
+  curl --fail http://127.0.0.1:3002/api/stats
+```
+
+## 3. Enable HTTPS
+
+After all six DNS names resolve to this VPS and HTTP works, let Certbot update
+the installed nginx site and redirect HTTP to HTTPS:
+
+```bash
+sudo certbot --nginx --redirect \
+  -d topairepos.com -d www.topairepos.com \
+  -d aireporank.com -d www.aireporank.com \
+  -d airepolist.com -d www.airepolist.com
+sudo certbot renew --dry-run
+```
+
+Do not reinstall `deploy/nginx.conf` over Certbot's managed copy afterward
+without first preserving the generated TLS directives.

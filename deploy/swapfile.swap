@@ -1,0 +1,10 @@
+[Unit]
+Description=VPS build safety swapfile
+Documentation=https://github.com/kittisora/top-ai-repos
+
+[Swap]
+What=/swapfile
+TimeoutSec=0
+
+[Install]
+WantedBy=swap.target

@@ -1,0 +1,59 @@
+[Unit]
+Description=Top AI Repos web application
+Documentation=https://github.com/kittisora/top-ai-repos
+Wants=network-online.target
+After=network-online.target
+ConditionPathIsSymbolicLink=/srv/top-ai-repos/current
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=topairepos
+Group=topairepos
+WorkingDirectory=/srv/top-ai-repos/current
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=NPM_CONFIG_UPDATE_NOTIFIER=false
+Environment=HOME=/var/cache/top-ai-repos
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3002
+Restart=always
+RestartSec=5s
+TimeoutStartSec=60s
+TimeoutStopSec=30s
+KillMode=control-group
+UMask=0027
+
+# The deployed tree is read-only except for Next.js's runtime cache.
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/top-ai-repos/current/.next/cache
+CacheDirectory=top-ai-repos
+CacheDirectoryMode=0750
+RuntimeDirectory=top-ai-repos
+RuntimeDirectoryMode=0750
+
+# Runtime hardening that remains compatible with Node.js networking and JIT.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RemoveIPC=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

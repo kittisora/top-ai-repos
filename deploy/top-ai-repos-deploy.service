@@ -1,0 +1,44 @@
+[Unit]
+Description=CI-gated deployment of Top AI Repos
+Documentation=https://github.com/kittisora/top-ai-repos
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /usr/local/sbin/top-ai-repos-deploy
+TimeoutStartSec=2h
+UMask=0027
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+MemoryHigh=2500M
+MemoryMax=3500M
+OOMPolicy=stop
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
+
+# Builds need network access, but may write only beneath the explicit app root
+# (plus the service's private /tmp). The deployer drops to topairepos-deploy
+# for all Git/npm/build/database commands.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/top-ai-repos
+RuntimeDirectory=top-ai-repos-deploy
+RuntimeDirectoryMode=0755
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
