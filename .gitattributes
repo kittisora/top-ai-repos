@@ -1,0 +1,5 @@
+# Normalize line endings: LF in the repo, checked out native on each OS.
+* text=auto eol=lf
+
+# Binary / generated lockfile — never diffed, never merged by hand.
+package-lock.json -diff

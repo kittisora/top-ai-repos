@@ -1,0 +1,365 @@
+@import "github-markdown-css/github-markdown.css";
+@import "tailwindcss";
+/* Untitled UI design system: token theme + typography scale. */
+@import "../styles/theme.css";
+@import "../styles/typography.css";
+
+@plugin "@tailwindcss/typography";
+@plugin "tailwindcss-react-aria-components";
+@plugin "tailwindcss-animate";
+
+/*
+ * The neutral ramp — the single knob that sets the whole theme's temperature.
+ *
+ * Untitled UI's theme.css never defines `--color-neutral-*`; it just references
+ * it, so the values fall through to Tailwind's default `neutral`, which is a
+ * pure hueless grey. In dark mode that made every surface a flat near-black
+ * (neutral-950 is ~#0A0A0A) and the page read as a void.
+ *
+ * These replace it with a BLUE-TINTED ramp whose dark end is deliberately
+ * lighter, matching the logo's blue: enough chroma to feel like a considered
+ * colour rather than grey, little enough that content and the brand accent stay
+ * the things you notice. OKLCH so the steps are perceptually even.
+ *
+ * Every dark surface derives from this, which is why one ramp is all it takes:
+ *   bg-primary   -> neutral-950   (page)
+ *   bg-secondary -> neutral-900   (cards, sitting a step ABOVE the page)
+ *   bg-tertiary  -> neutral-800   (inputs, hover)
+ *   border-*     -> neutral-700/800
+ *   text-*       -> neutral-50/300/400
+ */
+@theme {
+  --color-neutral-25: oklch(0.995 0.002 262);
+  --color-neutral-50: oklch(0.984 0.004 262);
+  --color-neutral-100: oklch(0.964 0.007 262);
+  --color-neutral-200: oklch(0.925 0.01 262);
+  --color-neutral-300: oklch(0.862 0.014 262);
+  --color-neutral-400: oklch(0.706 0.019 262);
+  --color-neutral-500: oklch(0.6 0.022 262);
+  --color-neutral-600: oklch(0.5 0.024 262);
+  --color-neutral-700: oklch(0.4 0.026 262);
+  --color-neutral-800: oklch(0.328 0.027 263);
+  --color-neutral-900: oklch(0.262 0.025 263);
+  --color-neutral-950: oklch(0.222 0.023 264);
+}
+
+/*
+ * Tailwind v4 is CSS-first: no tailwind.config.js, and `darkMode:'class'` is
+ * gone. Our theme toggle sets `.dark` on <html>; theme.css was rewritten from
+ * Untitled UI's `.dark-mode` to `.dark` so the two agree.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant label (& [data-label]);
+@custom-variant focus-input-within (&:has(input:focus));
+
+@utility scrollbar-hide {
+  &::-webkit-scrollbar {
+    display: none;
+    -webkit-appearance: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@utility transition-inherit-all {
+  transition-property: inherit;
+  transition-duration: inherit;
+  transition-timing-function: inherit;
+}
+
+/* Untitled UI base resets (native control chrome its components assume gone). */
+details summary::-webkit-details-marker {
+  display: none;
+}
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/*
+ * Palette notes:
+ *  - One accent (indigo) carries every interactive affordance. Everything else
+ *    is a neutral ramp, because a data explorer that colours six things at once
+ *    stops communicating anything.
+ *  - Grade colours are a semantic ramp, never the sole carrier of meaning:
+ *    QualityBadge always prints the LETTER as well.
+ */
+:root {
+  --background: oklch(0.995 0.001 260);
+  --surface: oklch(0.975 0.002 260);
+  --card: oklch(1 0 0);
+  --foreground: oklch(0.21 0.02 265);
+  --muted-foreground: oklch(0.52 0.016 265);
+  --faint-foreground: oklch(0.64 0.014 265);
+  --border: oklch(0.905 0.005 265);
+  --border-strong: oklch(0.84 0.008 265);
+  --accent: oklch(0.53 0.19 268);
+  --accent-hover: oklch(0.47 0.19 268);
+  --accent-foreground: oklch(0.99 0 0);
+  --accent-soft: oklch(0.955 0.028 268);
+
+  --positive: oklch(0.53 0.15 150);
+  --negative: oklch(0.55 0.2 25);
+  --warning: oklch(0.62 0.15 70);
+
+  --grade-a: oklch(0.5 0.15 152);
+  --grade-b: oklch(0.5 0.13 190);
+  --grade-c: oklch(0.55 0.13 85);
+  --grade-d: oklch(0.57 0.16 50);
+  --grade-f: oklch(0.55 0.19 25);
+}
+
+/*
+ * GitHub returns the README as sanitized `markdown-body` HTML. The imported
+ * stylesheet is generated from GitHub.com; these overrides bind its color
+ * tokens to our explicit class-based theme toggle instead of the OS setting.
+ */
+.github-readme-shell {
+  border-color: #d1d9e0;
+  background-color: #ffffff;
+}
+
+.readme-preview .markdown-body {
+  color-scheme: light;
+  --fgColor-danger: #d1242f;
+  --bgColor-attention-muted: #fff8c5;
+  --bgColor-danger-muted: #ffebe9;
+  --bgColor-default: #ffffff;
+  --bgColor-muted: #f6f8fa;
+  --bgColor-neutral-muted: #818b981f;
+  --borderColor-accent-emphasis: #0969da;
+  --borderColor-attention-emphasis: #9a6700;
+  --borderColor-danger-emphasis: #cf222e;
+  --borderColor-default: #d1d9e0;
+  --borderColor-done-emphasis: #8250df;
+  --borderColor-success-emphasis: #1a7f37;
+  --borderColor-muted: #d1d9e0b3;
+  --borderColor-neutral-muted: var(--borderColor-muted);
+  --color-prettylights-syntax-brackethighlighter-angle: #59636e;
+  --color-prettylights-syntax-brackethighlighter-unmatched: #82071e;
+  --color-prettylights-syntax-carriage-return-bg: #cf222e;
+  --color-prettylights-syntax-carriage-return-text: #f6f8fa;
+  --color-prettylights-syntax-comment: #59636e;
+  --color-prettylights-syntax-constant: #0550ae;
+  --color-prettylights-syntax-constant-other-reference-link: #0a3069;
+  --color-prettylights-syntax-entity: #6639ba;
+  --color-prettylights-syntax-entity-tag: #0550ae;
+  --color-prettylights-syntax-invalid-illegal-bg: var(--bgColor-danger-muted);
+  --color-prettylights-syntax-invalid-illegal-text: var(--fgColor-danger);
+  --color-prettylights-syntax-keyword: #cf222e;
+  --color-prettylights-syntax-markup-bold: #1f2328;
+  --color-prettylights-syntax-markup-changed-bg: #ffd8b5;
+  --color-prettylights-syntax-markup-changed-text: #953800;
+  --color-prettylights-syntax-markup-deleted-bg: #ffebe9;
+  --color-prettylights-syntax-markup-deleted-text: #82071e;
+  --color-prettylights-syntax-markup-heading: #0550ae;
+  --color-prettylights-syntax-markup-ignored-bg: #0550ae;
+  --color-prettylights-syntax-markup-ignored-text: #d1d9e0;
+  --color-prettylights-syntax-markup-inserted-bg: #dafbe1;
+  --color-prettylights-syntax-markup-inserted-text: #116329;
+  --color-prettylights-syntax-markup-italic: #1f2328;
+  --color-prettylights-syntax-markup-list: #3b2300;
+  --color-prettylights-syntax-meta-diff-range: #8250df;
+  --color-prettylights-syntax-storage-modifier-import: #1f2328;
+  --color-prettylights-syntax-string: #0a3069;
+  --color-prettylights-syntax-string-regexp: #116329;
+  --color-prettylights-syntax-sublimelinter-gutter-mark: #818b98;
+  --color-prettylights-syntax-variable: #953800;
+  --fgColor-accent: #0969da;
+  --fgColor-attention: #9a6700;
+  --fgColor-default: #1f2328;
+  --fgColor-done: #8250df;
+  --fgColor-muted: #59636e;
+  --fgColor-success: #1a7f37;
+  --focus-outlineColor: var(--borderColor-accent-emphasis);
+}
+
+.dark .github-readme-shell {
+  border-color: #3d444d;
+  background-color: #0d1117;
+}
+
+.dark .readme-preview .markdown-body {
+  color-scheme: dark;
+  --fgColor-accent: #4493f8;
+  --bgColor-attention-muted: #bb800926;
+  --bgColor-danger-muted: #490202;
+  --bgColor-default: #0d1117;
+  --bgColor-muted: #151b23;
+  --bgColor-neutral-muted: #656c7633;
+  --borderColor-accent-emphasis: #1f6feb;
+  --borderColor-attention-emphasis: #9e6a03;
+  --borderColor-danger-emphasis: #da3633;
+  --borderColor-default: #3d444d;
+  --borderColor-done-emphasis: #8957e5;
+  --borderColor-success-emphasis: #238636;
+  --borderColor-muted: #3d444db3;
+  --borderColor-neutral-muted: var(--borderColor-muted);
+  --color-prettylights-syntax-brackethighlighter-angle: #9198a1;
+  --color-prettylights-syntax-brackethighlighter-unmatched: #f85149;
+  --color-prettylights-syntax-carriage-return-bg: #b62324;
+  --color-prettylights-syntax-carriage-return-text: #f0f6fc;
+  --color-prettylights-syntax-comment: #9198a1;
+  --color-prettylights-syntax-constant: #79c0ff;
+  --color-prettylights-syntax-constant-other-reference-link: #a5d6ff;
+  --color-prettylights-syntax-entity: #d2a8ff;
+  --color-prettylights-syntax-entity-tag: #7ee787;
+  --color-prettylights-syntax-invalid-illegal-bg: var(--bgColor-danger-muted);
+  --color-prettylights-syntax-invalid-illegal-text: var(--fgColor-danger);
+  --color-prettylights-syntax-keyword: #ff7b72;
+  --color-prettylights-syntax-markup-bold: #f0f6fc;
+  --color-prettylights-syntax-markup-changed-bg: #5a1e02;
+  --color-prettylights-syntax-markup-changed-text: #ffdfb6;
+  --color-prettylights-syntax-markup-deleted-bg: #67060c;
+  --color-prettylights-syntax-markup-deleted-text: #ffdcd7;
+  --color-prettylights-syntax-markup-heading: #1f6feb;
+  --color-prettylights-syntax-markup-ignored-bg: #1158c7;
+  --color-prettylights-syntax-markup-ignored-text: #f0f6fc;
+  --color-prettylights-syntax-markup-inserted-bg: #033a16;
+  --color-prettylights-syntax-markup-inserted-text: #aff5b4;
+  --color-prettylights-syntax-markup-italic: #f0f6fc;
+  --color-prettylights-syntax-markup-list: #f2cc60;
+  --color-prettylights-syntax-meta-diff-range: #d2a8ff;
+  --color-prettylights-syntax-storage-modifier-import: #f0f6fc;
+  --color-prettylights-syntax-string: #a5d6ff;
+  --color-prettylights-syntax-string-regexp: #7ee787;
+  --color-prettylights-syntax-sublimelinter-gutter-mark: #3d444d;
+  --color-prettylights-syntax-variable: #ffa657;
+  --fgColor-attention: #d29922;
+  --fgColor-danger: #f85149;
+  --fgColor-default: #f0f6fc;
+  --fgColor-done: #ab7df8;
+  --fgColor-muted: #9198a1;
+  --fgColor-success: #3fb950;
+  --focus-outlineColor: var(--borderColor-accent-emphasis);
+}
+
+.dark {
+  --background: oklch(0.165 0.012 265);
+  --surface: oklch(0.195 0.013 265);
+  --card: oklch(0.213 0.014 265);
+  --foreground: oklch(0.955 0.004 265);
+  --muted-foreground: oklch(0.72 0.014 265);
+  --faint-foreground: oklch(0.6 0.014 265);
+  --border: oklch(0.295 0.014 265);
+  --border-strong: oklch(0.38 0.016 265);
+  --accent: oklch(0.72 0.15 265);
+  --accent-hover: oklch(0.79 0.14 265);
+  --accent-foreground: oklch(0.17 0.02 265);
+  --accent-soft: oklch(0.28 0.05 265);
+
+  --positive: oklch(0.76 0.16 152);
+  --negative: oklch(0.7 0.18 25);
+  --warning: oklch(0.79 0.14 75);
+
+  --grade-a: oklch(0.78 0.16 152);
+  --grade-b: oklch(0.78 0.12 190);
+  --grade-c: oklch(0.81 0.13 88);
+  --grade-d: oklch(0.76 0.15 55);
+  --grade-f: oklch(0.72 0.17 25);
+}
+
+/*
+ * `inline` is load-bearing. Plain @theme would emit
+ * `.bg-card { background-color: var(--color-card) }`, which resolves once at
+ * :root — the `.dark` overrides above would never apply. With `inline` the
+ * utility references `var(--card)` directly and resolves at the element.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted-foreground);
+  --color-faint: var(--faint-foreground);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+
+  --color-grade-a: var(--grade-a);
+  --color-grade-b: var(--grade-b);
+  --color-grade-c: var(--grade-c);
+  --color-grade-d: var(--grade-d);
+  --color-grade-f: var(--grade-f);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Static values need no `inline` — plain @theme is correct and cheaper. */
+@theme {
+  --breakpoint-3xl: 100rem;
+}
+
+@layer base {
+  /* Default border colour so a bare `border` utility reads as the UUI hairline. */
+  * {
+    border-color: var(--color-border-secondary);
+  }
+
+  html {
+    color-scheme: light;
+    /* Next 16 stopped overriding this during route transitions; the attribute
+       on <html> is what restores instant scroll-to-top on navigation. */
+    scroll-behavior: smooth;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Keyboard focus must always be visible; mouse focus must not shout. */
+  :focus-visible {
+    outline: 2px solid var(--color-border-brand);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-bg-brand-secondary);
+    color: var(--color-text-primary);
+  }
+
+  /* Native controls otherwise render white-on-white in the dark theme. */
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer components {
+  /* Every metric in the product is tabular so columns line up between rows. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Tailwind's reset makes images block-level; GitHub badge rows require inline images. */
+.readme-preview .markdown-body img {
+  display: inline-block;
+}

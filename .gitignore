@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+dist/
+
+# secrets — never commit
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# runtime data / caches
+.cache/
+data/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# typescript
+*.tsbuildinfo
+
+# editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# misc
+coverage/
+.vercel
+
+# Reference portfolio project copied in for design reference — not part of this app
+/kitti/
+/pro-comp/
