@@ -28,6 +28,12 @@ Point these records at the VPS before requesting certificates:
 | `airepolist.com` | `A` | `62.238.43.103` |
 | `www.airepolist.com` | `A` | `62.238.43.103` |
 
+Cloudflare's proxied (orange-cloud) records are supported; the HTTP-01
+challenge is forwarded through Cloudflare to nginx. After the origin
+certificate is installed, set **SSL/TLS → Overview → Encryption mode** to
+**Full (strict)**. Do not use Flexible mode. Cloudflare may publish edge AAAA
+answers automatically even when the origin record is IPv4-only.
+
 Open TCP ports 80 and 443. Install system-wide Node.js 22.6 or newer so both
 `/usr/bin/node` and `/usr/bin/npm` exist, then install the remaining packages:
 
@@ -101,7 +107,7 @@ curl --fail http://127.0.0.1:3002/api/health || \
 
 ## 3. Enable HTTPS
 
-After all six DNS names resolve to this VPS and HTTP works, let Certbot update
+After all six DNS records exist and HTTP reaches this VPS, let Certbot update
 the installed nginx site and redirect HTTP to HTTPS:
 
 ```bash
@@ -110,6 +116,15 @@ sudo certbot --nginx --redirect \
   -d aireporank.com -d www.aireporank.com \
   -d airepolist.com -d www.airepolist.com
 sudo certbot renew --dry-run
+```
+
+With Cloudflare proxying enabled, switch each zone to **Full (strict)** after
+the command succeeds, then verify both the public edge and the origin:
+
+```bash
+curl --fail --head https://topairepos.com
+curl --fail --head --resolve topairepos.com:443:62.238.43.103 \
+  https://topairepos.com
 ```
 
 Do not reinstall `deploy/nginx.conf` over Certbot's managed copy afterward
