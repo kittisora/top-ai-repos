@@ -33,7 +33,7 @@ Open TCP ports 80 and 443. Install system-wide Node.js 22.6 or newer so both
 
 ```bash
 sudo apt update
-sudo apt install -y git curl jq nginx certbot python3-certbot-nginx
+sudo apt install -y git curl jq libarchive-tools nginx certbot python3-certbot-nginx
 /usr/bin/node --version
 /usr/bin/npm --version
 ```

@@ -34,7 +34,7 @@ readonly CURL_BIN='/usr/bin/curl'
 readonly JQ_BIN='/usr/bin/jq'
 readonly HEAD_BIN='/usr/bin/head'
 readonly NPM_BIN='/usr/bin/npm'
-readonly TAR_BIN='/usr/bin/tar'
+readonly BSDTAR_BIN='/usr/bin/bsdtar'
 readonly BASH_BIN='/usr/bin/bash'
 readonly SETPRIV_BIN='/usr/bin/setpriv'
 readonly SYSTEMCTL_BIN='/usr/bin/systemctl'
@@ -263,8 +263,8 @@ prepare_release() {
   install -d -o "$BUILD_USER" -g "$APP_GROUP" -m 0750 "$release"
   log "exporting commit ${sha}"
   if ! run_as_builder "$BASH_BIN" -c \
-    'set -o pipefail; "$1" --git-dir="$2" archive --format=tar "$3" | "$4" -xf - -C "$5"' \
-    _ "$GIT_BIN" "$REPOSITORY_DIR" "$sha" "$TAR_BIN" "$release"; then
+    'set -o pipefail; "$1" --git-dir="$2" archive --format=tar "$3" | "$4" --no-same-owner --no-same-permissions -xf - -C "$5"' \
+    _ "$GIT_BIN" "$REPOSITORY_DIR" "$sha" "$BSDTAR_BIN" "$release"; then
     safe_remove_release "$release"
     return 1
   fi
@@ -304,6 +304,7 @@ prepare_release() {
   # is the only application-owned subtree and is also the only ReadWritePaths
   # exception in the application systemd unit.
   chown -hR root:"$APP_GROUP" "$release"
+  chmod -R a-s "$release"
   chmod -R u=rwX,g=rX,o= "$release"
   install -d -o "$APP_USER" -g "$APP_GROUP" -m 0750 "${release}/.next/cache"
   chown -hR "$APP_USER":"$APP_GROUP" "${release}/.next/cache"
@@ -398,7 +399,7 @@ main() {
   require_executable "$JQ_BIN"
   require_executable "$HEAD_BIN"
   require_executable "$NPM_BIN"
-  require_executable "$TAR_BIN"
+  require_executable "$BSDTAR_BIN"
   require_executable "$BASH_BIN"
   require_executable "$SETPRIV_BIN"
   require_executable "$SYSTEMCTL_BIN"
