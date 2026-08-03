@@ -250,6 +250,43 @@ export async function upsertDiscovered(
           githubCreatedAt: sql`excluded.github_created_at`,
           githubPushedAt: sql`excluded.github_pushed_at`,
           githubUpdatedAt: sql`excluded.github_updated_at`,
+          /**
+           * Invalidate the classification watermark when — and only when — this
+           * upsert actually changes something a classifier reads.
+           *
+           * This is load-bearing for the candidate filter in ./classify.ts, which
+           * skips repos whose `classified_at` is newer than their
+           * `last_synced_at` on the grounds that their inputs cannot have moved.
+           * That reasoning covers `sync`, which always bumps last_synced_at — but
+           * NOT this statement, which rewrites description/topics/language and
+           * deliberately leaves last_synced_at alone so discovery cannot shove
+           * repos to the back of the sync work queue. Without this reset, a repo
+           * whose description changed here would be excluded from classification
+           * indefinitely and quietly keep a stale category.
+           *
+           * NULL rather than a timestamp because NULL is what "never attempted"
+           * means everywhere else, and it sorts first in the classifier's queue —
+           * so a changed repo is looked at on the next run rather than whenever
+           * its turn came round.
+           *
+           * `is distinct from` handles the NULLs these three columns all allow: a
+           * description going from NULL to text, or text to NULL, is a real change
+           * that `<>` would evaluate to NULL and therefore miss.
+           *
+           * The comparison is sound even though the SET list above already
+           * assigns `description`, `topics` and `language`: assignments in an
+           * UPDATE (and in ON CONFLICT DO UPDATE) are evaluated against the OLD
+           * row and applied together, so `repositories.description` here is the
+           * stored value, not the one being written on the line above. SET order
+           * is irrelevant — this does not need to come first to be correct.
+           */
+          classifiedAt: sql`case
+            when repositories.description is distinct from excluded.description
+              or repositories.topics      is distinct from excluded.topics
+              or repositories.language    is distinct from excluded.language
+            then null
+            else repositories.classified_at
+          end`,
         },
       })
       // `xmax = 0` is the standard way to tell an INSERT apart from an ON

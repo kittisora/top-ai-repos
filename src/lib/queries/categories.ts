@@ -11,6 +11,7 @@ import { and, asc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { categories, repositories, repositoryCategories } from '@/db/schema';
 import { GROUP_BY_SLUG, GROUPS } from '@/lib/taxonomy';
+import { AGGREGATE_TTL_MS, memoize } from './cache';
 
 export interface CategoryStat {
   slug: string;
@@ -46,7 +47,7 @@ export interface CategoryGroupStats {
  * non-archived, primary assignment only — so a category badge saying "112
  * repos" links to a page that actually shows 112 repos.
  */
-export async function getCategoryStats(): Promise<CategoryGroupStats[]> {
+async function loadCategoryStats(): Promise<CategoryGroupStats[]> {
   const rows = await db
     .select({
       slug: categories.slug,
@@ -135,3 +136,14 @@ export async function getCategoryStats(): Promise<CategoryGroupStats[]> {
 
   return ordered;
 }
+
+/**
+ * Memoised because this is rendered by the header nav, the homepage, /categories
+ * AND the filter sidebar on every explorer view — but it is a grouped two-way
+ * LEFT JOIN across every primary category assignment in the corpus, plus a
+ * percentile_cont that has to sort each category's quality scores. The request-
+ * scoped `cache()` wrapper in @/components/data dedupes it *within* one render;
+ * this dedupes it *across* requests, which is the part that matters when a
+ * crawler is walking the sitemap.
+ */
+export const getCategoryStats = memoize(loadCategoryStats, AGGREGATE_TTL_MS);

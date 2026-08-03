@@ -58,6 +58,16 @@ export const env = {
   get enableLlmClassify() {
     return bool('ENABLE_LLM_CLASSIFY', false) && Boolean(process.env.OPENAI_API_KEY);
   },
+  /**
+   * How long the read layer reuses its whole-table aggregates (see
+   * @/lib/queries/cache). Every page is force-dynamic, so without this each view
+   * re-scans the corpus for the stat tiles and filter dropdowns — which on a
+   * free-tier database is the difference between comfortable and over quota.
+   * Raise it if egress is tight; set 0 to disable caching while debugging.
+   */
+  get queryCacheTtlSeconds() {
+    return Math.max(0, int('QUERY_CACHE_TTL_SECONDS', 600));
+  },
   get siteName() {
     return process.env.NEXT_PUBLIC_SITE_NAME || 'Top AI Repos';
   },

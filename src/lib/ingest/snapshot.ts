@@ -111,6 +111,16 @@ export async function snapshot(options: SnapshotOptions = {}): Promise<SnapshotS
  *
  * COALESCE to the repo's own value means "no history" yields a delta of 0 rather
  * than a fabricated number equal to the repo's entire star count.
+ *
+ * WRITE ONLY WHAT MOVED. The three-way `<>` filter at the end is what keeps this
+ * off the free tier's Disk IO budget. Postgres cannot update a row in place: every
+ * UPDATE writes a new row version, and because stars_day and stars_week are both
+ * indexed the update is never HOT-eligible, so all 16 indexes on `repositories`
+ * (two of them GIN) take a write per row. Unfiltered, this statement rewrote the
+ * whole active table every single day — ~30k rows for the ~4.5% that actually
+ * moved — which is also where most of the dead space that `db:vacuum` reclaims
+ * came from. The deltas are NOT NULL with a default, and the right-hand
+ * expressions are COALESCE-guarded, so plain `<>` cannot be tripped by a NULL.
  */
 async function recomputeDeltas(today: string): Promise<number> {
   const from = new Date(`${today}T00:00:00Z`);
@@ -138,7 +148,13 @@ async function recomputeDeltas(today: string): Promise<number> {
       where m.repository_id = src.id and m.recorded_on <= ${daysAgoIso(30, from)}::date
       order by m.recorded_on desc limit 1
     ) d30 on true
-    where r.id = src.id and r.status = 'active'
+    where r.id = src.id
+      and r.status = 'active'
+      and (
+        r.stars_day   <> r.stars - coalesce(d1.stars,  r.stars)
+        or r.stars_week  <> r.stars - coalesce(d7.stars,  r.stars)
+        or r.stars_month <> r.stars - coalesce(d30.stars, r.stars)
+      )
   `);
 
   return real.rowCount ?? 0;

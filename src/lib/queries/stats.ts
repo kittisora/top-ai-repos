@@ -2,16 +2,24 @@
  * Site-wide aggregates: the homepage header numbers, the geography view and the
  * language filter's options.
  *
- * All of these are cheap full-table aggregates over a few thousand rows. They
- * are written as plain grouped queries rather than materialised views because
- * the ingestion pipeline rewrites the whole repositories table on every sync,
- * and a view would need refreshing on exactly the same cadence for no gain.
+ * These are full-table aggregates. They are written as plain grouped queries
+ * rather than materialised views because the ingestion pipeline rewrites the
+ * repositories table on every sync, and a view would need refreshing on exactly
+ * the same cadence for no gain.
+ *
+ * What they are NOT is cheap. Each one touches every active repository (and
+ * getCountryStats every contributor too), the pages that show them are all
+ * force-dynamic, and the corpus is ~30k repos and ~53k contributors — so every
+ * one of these is exported through the TTL memo in ./cache. The results only
+ * change when the daily pipeline runs; re-deriving them per request was the
+ * single largest source of this project's database egress and read IO.
  */
 
 import { and, count, desc, eq, isNotNull, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { categories, contributors, repositories, syncRuns } from '@/db/schema';
+import { AGGREGATE_TTL_MS, memoize } from './cache';
 
 export interface GlobalStats {
   /** Active (non-rejected) repositories in the index, archived included. */
@@ -30,7 +38,7 @@ export interface GlobalStats {
   lastSyncStats: Record<string, number | string> | null;
 }
 
-export async function getGlobalStats(): Promise<GlobalStats> {
+async function loadGlobalStats(): Promise<GlobalStats> {
   const [repoTotals, categoryTotal, contributorTotal, lastSync] = await Promise.all([
     // One pass over repositories for six numbers — FILTER lets a conditional
     // count ride along on the same scan instead of costing another query.
@@ -85,6 +93,14 @@ export async function getGlobalStats(): Promise<GlobalStats> {
   };
 }
 
+/**
+ * Read by the homepage stat tiles AND by the explorer on every filtered view, so
+ * this is the most-called query in the app. `count(distinct language)` and
+ * `count(distinct owner_country)` cannot use an index — they are a sort or a hash
+ * over every active row — which is why it is memoised rather than merely indexed.
+ */
+export const getGlobalStats = memoize(loadGlobalStats, AGGREGATE_TTL_MS);
+
 // ---------------------------------------------------------------------------
 // Geography
 // ---------------------------------------------------------------------------
@@ -102,7 +118,7 @@ export interface CountryStat {
  * be built mostly by people elsewhere — so they are aggregated separately and
  * merged, rather than joined into a number that means neither.
  */
-export async function getCountryStats(): Promise<CountryStat[]> {
+async function loadCountryStats(): Promise<CountryStat[]> {
   const [repoRows, contributorRows] = await Promise.all([
     db
       .select({
@@ -155,6 +171,13 @@ export async function getCountryStats(): Promise<CountryStat[]> {
   );
 }
 
+/**
+ * The costliest of the four: two grouped scans, one of them over the whole
+ * contributors table. It feeds a filter dropdown of ~200 countries that changes
+ * about once a day.
+ */
+export const getCountryStats = memoize(loadCountryStats, AGGREGATE_TTL_MS);
+
 // ---------------------------------------------------------------------------
 // Languages
 // ---------------------------------------------------------------------------
@@ -170,7 +193,7 @@ export interface LanguageStat {
  * can be passed straight back as `?language=` and hit the btree index on an
  * exact match.
  */
-export async function getLanguages(): Promise<LanguageStat[]> {
+async function loadLanguages(): Promise<LanguageStat[]> {
   const rows = await db
     .select({
       language: repositories.language,
@@ -188,3 +211,6 @@ export async function getLanguages(): Promise<LanguageStat[]> {
       : [],
   );
 }
+
+/** Options for the language dropdown — a grouped scan of every active repo. */
+export const getLanguages = memoize(loadLanguages, AGGREGATE_TTL_MS);

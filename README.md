@@ -209,6 +209,98 @@ should be. It takes an **exclusive lock** per table (~25s for the biggest one), 
 run it when the site is quiet, and it needs temporary room for the rewritten copy
 — don't run it while already pressed against the size limit.
 
+## Disk IO, egress and write amplification
+
+Two more free-tier budgets, both easier to blow through than disk space:
+
+**Disk IO** — Supabase emails you when a project depletes it, and a depleted
+budget shows up as slow responses and IO wait rather than as an error.
+
+**Egress** — the database is *hosted*, so it is on a different machine from both
+the Next.js server and the ingestion worker. Every row either of them reads
+crosses the network and is billed. That reframes two things: a query's cost is its
+**result size**, not just its plan; and the nightly `npm run daily` is a
+first-class egress consumer, not just a GitHub API consumer. Hence the reductions
+in `score` (booleans and counts computed in SQL instead of shipping the
+description text and topics array for 30k repos) and the column projections in the
+read layer (`repoCardColumns` exists so `search_vector` never crosses the wire).
+
+Postgres never updates a row in place: every `UPDATE` writes a new row version
+and leaves the old one dead. `repositories` carries **16 indexes** (two of them
+GIN — the full-text `search_vector` and the trigram index on `full_name`), and
+because `stars_day`, `stars_week`, `trend_score` and `quality_score` are all
+indexed, an update to any of them can never be HOT-eligible — so it writes to
+every index on the table.
+
+Two pipeline stages used to rewrite the *entire* active table daily:
+`snapshot`'s delta recomputation and all of `score`. That is ~30,000 row versions
+× 16 indexes, twice a day, for the **~4.5% of repos that actually moved** — and it
+was also where most of the dead space `db:vacuum` reclaims came from.
+
+Both now compare against the stored value in SQL and update only the rows whose
+values genuinely differ (`is distinct from` where the column is nullable, so a
+never-scored repo is not skipped forever). Same results, ~95% less write IO. The
+`score` stage reports both numbers, so the gap is visible in `sync_runs`:
+
+```
+score: scored 29431, wrote 1604 changed row(s) (A: 812, F: 2290)
+```
+
+Writing a value identical to the one already stored costs exactly as much IO as a
+real change, so if you add a stage that bulk-updates `repositories`, filter it the
+same way.
+
+`classify` has the equivalent problem on the *read* side: it selected 5,000 rows a
+night including a 4,000-character README slice, in order to compute the fingerprint
+that then usually concluded nothing had changed. It now skips repos whose
+`classified_at` is newer than their `last_synced_at` — those cannot have had their
+inputs rewritten by `sync`, so they would have hit the fingerprint cache anyway.
+
+**That filter has a partner that must not be removed.** `discover`'s upsert also
+overwrites description/topics/language, and deliberately does *not* touch
+`last_synced_at` (doing so would let discovery shove repos to the back of the sync
+queue). So that upsert resets `classified_at` to NULL when those values actually
+differ. Drop either half and rediscovered repos silently keep a stale category —
+the two changes are only correct together.
+
+**On the read side**, every page is `force-dynamic`, so a single view of `/repos`
+re-ran four whole-corpus aggregates (`getGlobalStats`, `getLanguages`,
+`getCountryStats`, `getCategoryStats`) for the stat tiles and filter dropdowns —
+and `/sitemap.xml` re-ran a 45,000-row query on every crawler fetch. None of those
+results can change between requests; the pipeline moves them once a day. They are
+now served through a small in-process TTL memo
+([src/lib/queries/cache.ts](src/lib/queries/cache.ts)) that also collapses
+concurrent callers onto one in-flight query, so a crawler burst cannot fire N
+identical full scans at once. Tune with `QUERY_CACHE_TTL_SECONDS` (default 600;
+`0` disables it).
+
+**Repository detail pages are the one route that is cached outright.** There are
+~29,000 of them, every one is in the sitemap, and each render costs a 4,000-char
+README excerpt plus 90 metric rows plus 20 contributors plus a live GitHub fetch —
+so served `force-dynamic` they were the largest single share of egress. They now
+use ISR at `revalidate = 3600`, which is safe because the pipeline only moves the
+underlying numbers once a day.
+
+That route also exports `generateStaticParams` returning an **empty array**, and
+it is load-bearing: without it Next writes no fallback entry for the route,
+`dynamicRoutes` in `.next/prerender-manifest.json` stays empty, and `revalidate`
+is silently ignored — every request server-renders anyway. With it, the route
+reports `●` rather than `ƒ` in the build summary and responses carry
+`x-nextjs-cache: HIT` after the first hit. Worth re-checking after a Next upgrade:
+
+```bash
+curl -sD - -o /dev/null http://localhost:3000/repos/openai/codex | grep -i x-nextjs-cache
+```
+
+Finally, `robots.txt` disallows `/repos?*`. Every filter lives in the query string,
+which is what makes a view shareable — and also means sort × category × language ×
+licence × country × stars × quality × page is an effectively infinite space of
+near-duplicate pages, each costing a filtered query plus the sidebar aggregates.
+Crawl budget goes to the 29k repository pages instead. The prefix stops at the
+`?`, so `/repos`, `/repos/owner/name` and `/categories/[slug]` stay crawlable —
+which is the payoff for expressing the taxonomy as real paths and only filters as
+query params.
+
 ## Deploying
 
 1. Set `NEXT_PUBLIC_SITE_URL` to the real domain **before** building — it is

@@ -316,7 +316,37 @@ export async function classify(options: ClassifyOptions = {}): Promise<ClassifyS
       readmeExcerpt: sql<string | null>`substring(${repositories.readmeExcerpt} from 1 for 4000)`,
     })
     .from(repositories)
-    .where(eq(repositories.status, 'active'))
+    .where(
+      and(
+        eq(repositories.status, 'active'),
+        /**
+         * Skip repos whose inputs demonstrably have not changed since the last
+         * attempt. This is an EGRESS filter, not a correctness one: every repo it
+         * excludes would have matched its stored fingerprint and done nothing —
+         * but only after its README had already crossed the network. At a 5,000
+         * limit that was ~20 MB a night to reach the same conclusion, and the
+         * database is on a different host from this worker, so it is billed.
+         *
+         * Two things make the predicate sound, and both must hold:
+         *
+         *  1. `classified_at is null` keeps every never-attempted repo, which is
+         *     how newly discovered repos enter regardless of watermarks.
+         *  2. `sync` bumps last_synced_at on everything it touches (including a
+         *     304), so a repo classified after its last sync cannot have had its
+         *     description/topics/language/readme rewritten by sync since.
+         *
+         * The gap that (2) leaves is `discover`, which also overwrites
+         * description/topics/language on its upsert WITHOUT touching
+         * last_synced_at. That path therefore resets classified_at to NULL itself
+         * when those values actually differ — see the upsert in ./discover.ts. If
+         * that reset is ever removed, this filter starts silently starving
+         * rediscovered repos of reclassification.
+         */
+        sql`(${repositories.classifiedAt} is null
+             or ${repositories.lastSyncedAt} is null
+             or ${repositories.classifiedAt} <= ${repositories.lastSyncedAt})`,
+      ),
+    )
     // Least-recently-ATTEMPTED first (indexed), never-attempted before all.
     // Deliberately not "least recently assigned": a repo the classifier cannot
     // place writes no assignment rows, so that ordering left its key permanently

@@ -25,6 +25,11 @@ export interface ScoreOptions {
 
 export interface ScoreStats extends Record<string, number | string> {
   scored: number;
+  /**
+   * How many rows the UPDATE actually touched. Almost always a small fraction of
+   * `scored` — see the change filter in the UPDATE below.
+   */
+  changed: number;
   gradeA: number;
   gradeF: number;
   flagged: number;
@@ -59,9 +64,23 @@ export async function score(options: ScoreOptions = {}): Promise<ScoreStats> {
       releasesLastYear: repositories.releasesLastYear,
       licenseSpdxId: repositories.licenseSpdxId,
       readmeLength: repositories.readmeLength,
-      homepage: repositories.homepage,
-      description: repositories.description,
-      topics: repositories.topics,
+      /**
+       * Reduced in SQL rather than selected raw, because the scorer only ever
+       * asks whether these are present or how many there are — it never reads
+       * the values. Shipping the actual description text and topics array for
+       * every active repo meant several megabytes crossing the network each
+       * night to compute a boolean and a count. The database and the worker are
+       * on different hosts, so that transfer is billable egress.
+       *
+       * `coalesce(x, '') <> ''` reproduces JS `Boolean(x)` exactly for the two
+       * falsy cases a text column can hold, NULL and '', so the scores are
+       * unchanged.
+       */
+      hasHomepage: sql<boolean>`coalesce(${repositories.homepage}, '') <> ''`,
+      hasDescription: sql<boolean>`coalesce(${repositories.description}, '') <> ''`,
+      topicsCount: sql<number>`coalesce(jsonb_array_length(${repositories.topics}), 0)`.mapWith(
+        Number,
+      ),
       isArchived: repositories.isArchived,
       isFork: repositories.isFork,
     })
@@ -73,7 +92,7 @@ export async function score(options: ScoreOptions = {}): Promise<ScoreStats> {
   const contributorsWeekById = await contributorGrowth(now, repos);
 
   const rows: ScoreRow[] = [];
-  const stats: ScoreStats = { scored: 0, gradeA: 0, gradeF: 0, flagged: 0 };
+  const stats: ScoreStats = { scored: 0, changed: 0, gradeA: 0, gradeF: 0, flagged: 0 };
 
   for (const repo of repos) {
     const trend = computeTrendScore({
@@ -100,9 +119,9 @@ export async function score(options: ScoreOptions = {}): Promise<ScoreStats> {
       releasesLastYear: repo.releasesLastYear,
       licenseSpdxId: repo.licenseSpdxId,
       readmeLength: repo.readmeLength,
-      hasHomepage: Boolean(repo.homepage),
-      hasDescription: Boolean(repo.description),
-      topicsCount: repo.topics.length,
+      hasHomepage: repo.hasHomepage,
+      hasDescription: repo.hasDescription,
+      topicsCount: repo.topicsCount,
       isArchived: repo.isArchived,
       isFork: repo.isFork,
       now,
@@ -134,7 +153,30 @@ export async function score(options: ScoreOptions = {}): Promise<ScoreStats> {
       sql`, `,
     );
 
-    await db.execute(sql`
+    /**
+     * The `is distinct from` block is not an optimisation detail — it is what
+     * keeps this stage inside a free-tier Disk IO budget.
+     *
+     * Without it this UPDATE rewrites every active row every day. Postgres has
+     * no in-place update: each row gets a new version and the old one becomes
+     * dead space. Two of the five columns written here are indexed (trend_score
+     * by trend_idx, quality_score by quality_idx), which is enough to disqualify
+     * the update from being a heap-only tuple — and a non-HOT update has to
+     * insert a new index entry into EVERY index on the table, not just the ones
+     * whose columns changed. `repositories` carries 16, two of them GIN. So the
+     * unfiltered version cost ~30k row versions x 16 index writes, daily.
+     *
+     * Scores are stable for the overwhelming majority of repos on any given day:
+     * quality moves only when maintenance signals change, and trend is 0 for
+     * anything that gained no stars. Writing a value identical to the one
+     * already stored costs exactly as much IO as a real change and buys nothing,
+     * so filter those rows out in SQL rather than shipping them.
+     *
+     * `is distinct from` rather than `<>` because quality_score and
+     * quality_grade are nullable: a NULL <> 5 comparison yields NULL, which
+     * WHERE treats as false, so a never-scored repo would be skipped forever.
+     */
+    const result = await db.execute(sql`
       update repositories r
       set trend_score    = v.trend_score,
           trend_velocity = v.trend_velocity,
@@ -143,12 +185,23 @@ export async function score(options: ScoreOptions = {}): Promise<ScoreStats> {
           quality_flags  = v.quality_flags
       from (values ${values}) as v(id, trend_score, trend_velocity, quality_score, quality_grade, quality_flags)
       where r.id = v.id
+        and (
+          r.trend_score    is distinct from v.trend_score
+          or r.trend_velocity is distinct from v.trend_velocity
+          or r.quality_score  is distinct from v.quality_score
+          or r.quality_grade  is distinct from v.quality_grade
+          or r.quality_flags  is distinct from v.quality_flags
+        )
     `);
 
     stats.scored += batch.length;
+    stats.changed += result.rowCount ?? 0;
   }
 
-  log(`scored ${stats.scored} (A: ${stats.gradeA}, F: ${stats.gradeF})`);
+  log(
+    `scored ${stats.scored}, wrote ${stats.changed} changed row(s) ` +
+      `(A: ${stats.gradeA}, F: ${stats.gradeF})`,
+  );
   return stats;
 }
 

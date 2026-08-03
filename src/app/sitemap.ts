@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next';
 import { desc, eq } from 'drizzle-orm';
 
 import { db, repositories } from '@/db';
+import { memoize, SITEMAP_TTL_MS } from '@/lib/queries/cache';
 import { CATEGORIES } from '@/lib/taxonomy';
 import { env } from '@/lib/env';
 
@@ -20,6 +21,29 @@ export const dynamic = 'force-dynamic';
  * important repos are the ones dropped. Past 50k, switch to generateSitemaps().
  */
 const REPO_URL_LIMIT = 45_000;
+
+/**
+ * The row set is memoised for hours because this is the single heaviest read in
+ * the app — 45,000 rows, ordered by stars — and it is requested by crawlers, not
+ * by users. Google, Bing and every SEO scraper re-fetch /sitemap.xml on their own
+ * schedule and each fetch was paying for the full query. The contents change once
+ * a day at most, when the pipeline discovers new repos.
+ */
+const loadRepoRows = memoize(
+  () =>
+    db
+      .select({
+        ownerLogin: repositories.ownerLogin,
+        name: repositories.name,
+        pushedAt: repositories.githubPushedAt,
+        syncedAt: repositories.lastSyncedAt,
+      })
+      .from(repositories)
+      .where(eq(repositories.status, 'active'))
+      .orderBy(desc(repositories.stars))
+      .limit(REPO_URL_LIMIT),
+  SITEMAP_TTL_MS,
+);
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = env.siteUrl;
@@ -42,17 +66,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let repoRoutes: MetadataRoute.Sitemap = [];
   try {
-    const rows = await db
-      .select({
-        ownerLogin: repositories.ownerLogin,
-        name: repositories.name,
-        pushedAt: repositories.githubPushedAt,
-        syncedAt: repositories.lastSyncedAt,
-      })
-      .from(repositories)
-      .where(eq(repositories.status, 'active'))
-      .orderBy(desc(repositories.stars))
-      .limit(REPO_URL_LIMIT);
+    const rows = await loadRepoRows();
 
     repoRoutes = rows.map((row) => ({
       // Encode each path segment: owner/name are GitHub-safe, but encoding keeps

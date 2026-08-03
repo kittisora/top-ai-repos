@@ -17,7 +17,48 @@ import type { RepositoryDetail } from '@/lib/queries';
 import { repositoryJsonLd } from '@/lib/seo';
 import { cn, formatCompact, formatDelta, formatNumber, formatRelativeTime } from '@/lib/utils';
 
-export const dynamic = 'force-dynamic';
+/**
+ * ISR rather than force-dynamic — the one page in the app that is cached.
+ *
+ * There are ~29,000 of these and every one is in the sitemap, so they are the
+ * bulk of the crawlable surface. Each render is expensive: the repo row carries a
+ * 4,000-character README excerpt, plus 90 days of metric rows, plus 20
+ * contributors, plus a live GitHub fetch for the rendered README. Served
+ * force-dynamic, a crawler walking the sitemap paid all of that per URL per
+ * visit, which is where most of this project's database egress went.
+ *
+ * An hour is safe because nothing here changes faster than that: the pipeline
+ * runs once a day, so a cached page is at worst showing numbers from earlier in
+ * the same day. Unlike the homepage and the explorer this route can be cached at
+ * all because it has a dynamic segment and no `generateStaticParams` — Next
+ * renders it on first request rather than at build time, so the build never needs
+ * a database.
+ *
+ * ONE CAVEAT: `query()` turns a database failure into a rendered notice rather
+ * than a throw, and a successful render is what gets cached — so a blip during a
+ * cache miss can pin that notice on one repo URL until the window expires. It
+ * self-heals on the next revalidation; the tradeoff is worth it at 29,000 pages.
+ */
+export const revalidate = 3600;
+
+/**
+ * Returning an EMPTY array is load-bearing — do not delete this as dead code.
+ *
+ * `revalidate` on its own does nothing here. Without a `generateStaticParams`
+ * export Next has no fallback entry for the route, leaves `dynamicRoutes` in
+ * .next/prerender-manifest.json empty, and server-renders every request from
+ * scratch — which is what this file did before, and the caching above would have
+ * been silently inert. Exporting it with `[]` is the documented way to say
+ * "prerender nothing at build time, but cache each path once it is first
+ * requested": there are 29,000 of these and the build has no database, so
+ * enumerating them at build time is neither possible nor wanted.
+ *
+ * Verify with `npm run build` — the route must appear under `dynamicRoutes` with
+ * `fallbackRevalidate: 3600`, not merely as `ƒ` in the route summary.
+ */
+export function generateStaticParams(): { owner: string; name: string }[] {
+  return [];
+}
 
 interface DetailPageProps {
   params: Promise<{ owner: string; name: string }>;
