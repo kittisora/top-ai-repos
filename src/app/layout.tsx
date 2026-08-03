@@ -41,7 +41,17 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   applicationName: env.siteName,
   keywords: SITE_KEYWORDS,
-  alternates: { canonical: '/' },
+  /**
+   * Deliberately NO `alternates.canonical` here.
+   *
+   * Next merges metadata down the tree, so a canonical set on the root layout is
+   * inherited by every page that does not set its own — which pointed /repos,
+   * /categories, /contributors and /submit all at `/`, telling Google they were
+   * duplicates of the homepage and should not be indexed separately. Each route
+   * declares its own canonical instead (the homepage in ./page.tsx), so the
+   * failure mode for a page that forgets is *no* canonical, which Google handles
+   * by self-canonicalising — harmless — rather than a wrong one, which is not.
+   */
   openGraph: {
     type: 'website',
     url: '/',

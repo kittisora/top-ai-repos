@@ -1,4 +1,5 @@
 import { ArrowRight, Clock, Sparkles } from 'lucide-react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { query } from '@/components/data';
@@ -16,6 +17,15 @@ import { formatCompact, formatDelta, formatRelativeTime } from '@/lib/utils';
  * looked like (or did not look like) at build time into a static page.
  */
 export const dynamic = 'force-dynamic';
+
+/**
+ * Title and description come from the root layout's defaults; only the canonical
+ * is declared here, because the layout no longer sets one (it would be inherited
+ * by every other route — see the note there).
+ */
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 const LIST_SIZE = 8;
 
@@ -37,8 +47,14 @@ export default async function HomePage() {
   return (
     <div className="mx-auto max-w-[100rem] px-4 py-8 sm:px-6">
       <section className="mx-auto max-w-3xl text-center">
+        {/* The site name leads the H1 on purpose. This is the landing page for the
+            brand/domain query ("top ai repos"), and the <title> already carries the
+            phrase while the H1 previously did not — so the page's single strongest
+            on-page heading said nothing about what people actually search for.
+            `env.siteName` rather than a literal, so it tracks NEXT_PUBLIC_SITE_NAME
+            like every other user-facing string. */}
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Open-source AI, indexed and scored
+          {env.siteName} — open-source AI, indexed and scored
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm text-tertiary sm:text-base">
           {env.siteName} tracks AI repositories on GitHub and answers two different questions

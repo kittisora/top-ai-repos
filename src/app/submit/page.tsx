@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   description:
     'Suggest an open-source AI repository that is missing from the index. Submissions are ' +
     'queued for review and picked up by the next ingestion run.',
+  alternates: { canonical: '/submit' },
 };
 
 /**

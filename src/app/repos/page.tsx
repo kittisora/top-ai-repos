@@ -10,6 +10,14 @@ export const metadata: Metadata = {
   description:
     'Filter open-source AI repositories by category, language, licence, country, star count ' +
     'and quality score, sorted by momentum or by adoption risk.',
+  /**
+   * Self-referencing, which does two jobs: it stops this page inheriting the
+   * homepage's canonical (Next merges metadata down the tree), and it folds any
+   * `/repos?…` filter URL Google already indexed back into the unfiltered page —
+   * the same consolidation the `/repos?*` rule in ./robots.ts now prevents from
+   * being crawled in the first place.
+   */
+  alternates: { canonical: '/repos' },
 };
 
 export default async function ReposPage({

@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   description:
     'The people building open-source AI, ranked by how many indexed repositories they ' +
     'contribute to. Filterable by country and by category.',
+  // Country/category filters live in the query string; they are all views of this
+  // same ranking, so they consolidate here rather than competing with it.
+  alternates: { canonical: '/contributors' },
 };
 
 export default async function ContributorsPage({

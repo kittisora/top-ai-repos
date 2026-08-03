@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   description:
     `The ${env.siteName} taxonomy: infrastructure, model development and application ` +
     'development, with repository counts, star totals and median quality per category.',
+  alternates: { canonical: '/categories' },
 };
 
 /**
