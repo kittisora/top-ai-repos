@@ -10,8 +10,27 @@ import { env } from './env';
  * categorise ("RAG", "vector databases", "AI agents"), plus comparison intent
  * ("compare AI tools", "alternatives") which is where a directory actually wins
  * search traffic.
+ *
+ * BE CLEAR ABOUT WHAT THIS LIST DOES. Google dropped <meta name="keywords"> as a
+ * ranking signal in 2009 and Bing does not use it either, so nothing in here
+ * moves a position on either engine — editing it is not an SEO lever. It is kept
+ * because it costs nothing, a few minor engines still parse it, and it doubles as
+ * an explicit record of the queries this site is built to own. The terms that
+ * actually rank live in the <title>, the H1, SITE_DESCRIPTION and the body copy;
+ * if you want to target a new phrase, put it THERE and treat this list as the
+ * documentation of that decision rather than the mechanism.
  */
 export const SITE_KEYWORDS = [
+  // Brand and exact-match-domain terms first: these are the queries the site most
+  // wants to own, and they are what the three owned domains spell out
+  // (topairepos.com, aireporank.com, airepolist.com).
+  'top AI repos',
+  'top AI repositories',
+  'AI repo rank',
+  'AI repository rank',
+  'AI repo list',
+  'AI repository list',
+  // Then the discovery, category and comparison intent.
   'open source AI',
   'AI repositories',
   'open source AI tools',
@@ -34,10 +53,21 @@ export const SITE_KEYWORDS = [
   'AI tool alternatives',
 ];
 
+/**
+ * Feeds the meta description on every page AND the WebSite node's description in
+ * the JSON-LD below, so it is read in two places that both matter.
+ *
+ * It leads with the site name and "top open-source AI repositories" on purpose:
+ * Google truncates the displayed snippet around 155 characters, and the brand
+ * phrase this site is the landing page for previously did not appear in the
+ * description at all. Everything after the first sentence is the original copy,
+ * unchanged. `env.siteName` rather than a literal, matching the H1 and title.
+ */
 const SITE_DESCRIPTION =
-  'Discover, compare and track open-source AI repositories on GitHub. Browse by category, ' +
-  'language and licence; rank by star momentum, not just totals; and read a quality score ' +
-  'that weighs maintenance, release cadence, contributor bus-factor and licence safety.';
+  `${env.siteName} is a ranked list of the top open-source AI repositories on GitHub. ` +
+  'Browse by category, language and licence; rank by star momentum, not just totals; ' +
+  'and read a quality score that weighs maintenance, release cadence, contributor ' +
+  'bus-factor and licence safety.';
 
 export { SITE_DESCRIPTION };
 
