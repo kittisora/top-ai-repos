@@ -130,8 +130,11 @@ user submissions ───┘        (tsx scripts)         (Drizzle)      (Untit
 
 ## Setup
 
-Requires **Node 22.6+** and a hosted Postgres database (Supabase or Neon free
-tier is plenty).
+Requires **Node 22.6+** and Postgres 17. A hosted database (Supabase or Neon free
+tier) is plenty to start; if you outgrow it — or would rather not pay egress on
+every row the app reads — [docs/MIGRATION.md](docs/MIGRATION.md) is a runbook for
+moving the data onto a Postgres you run yourself, without losing the snapshot
+history that cannot be rebuilt.
 
 ```bash
 npm install
@@ -349,6 +352,7 @@ npm run db:migrate     # apply migrations
 npm run db:generate    # generate a migration from schema changes
 npm run db:vacuum      # reclaim disk space
 npm run db:studio      # browse the data
+npm run db:info        # server version, row counts, RLS state — migration baseline
 npm run seed           # load the category taxonomy
 ```
 

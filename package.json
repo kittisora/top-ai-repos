@@ -17,6 +17,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:check": "drizzle-kit check",
     "db:studio": "drizzle-kit studio",
+    "db:info": "tsx scripts/dbinfo.ts",
     "db:vacuum": "tsx scripts/vacuum.ts",
     "seed": "tsx scripts/seed.ts",
     "add": "tsx scripts/add.ts",
