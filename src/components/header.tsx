@@ -4,7 +4,7 @@ import { Menu, Plus, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -25,8 +25,12 @@ const NAV = [
  *
  * A client component because the mobile menu holds open/closed state and the
  * nav highlights the current section via usePathname.
+ *
+ * `starBadge` is a slot rather than an import: the GitHub star count is fetched
+ * on the server, which a client component cannot do, so the root layout renders
+ * @/components/github-star-badge and passes the element in.
  */
-export function Header() {
+export function Header({ starBadge }: { starBadge?: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
@@ -78,7 +82,19 @@ export function Header() {
                   alt=""
                   width={34}
                   height={34}
-                  priority
+                  /**
+                   * `loading="eager"`, NOT `priority`.
+                   *
+                   * `priority` would also emit `fetchpriority="high"` plus a
+                   * <link rel="preload">, and priority is zero-sum: it would put a
+                   * 34px decorative logo ahead of the stylesheet and the font that
+                   * the actual LCP element — the H1 text — is waiting on. A logo
+                   * this small can never be the LCP candidate itself.
+                   *
+                   * Eager still keeps it out of the lazy queue, so it paints with
+                   * the header rather than popping in afterwards.
+                   */
+                  loading="eager"
                   className="size-[34px] shrink-0 rounded-lg"
                 />
                 <span className="text-[1.167rem] font-semibold leading-none">{env.siteName}</span>
@@ -109,9 +125,11 @@ export function Header() {
               </nav>
             </div>
 
-            {/* Actions: theme toggle on both; the CTA on desktop; the hamburger
-                on mobile. */}
+            {/* Actions: the star badge and theme toggle on both; the CTA on
+                desktop; the hamburger on mobile. */}
             <div className="flex items-center gap-1.5 md:gap-2">
+              {starBadge}
+
               <ThemeToggle />
 
               <Button

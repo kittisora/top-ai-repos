@@ -102,6 +102,43 @@ export function formatRelativeTime(
   return 'unknown';
 }
 
+/**
+ * Ask GitHub for an avatar at the size we actually paint it.
+ *
+ * `avatar_url` from the API carries no size parameter, so GitHub serves the
+ * original upload. Measured against the top repos in this index: 19–24 KB each,
+ * to fill a 28px square. Adding `?s=N` makes GitHub's own CDN do the resize and
+ * the same images come back at 1.4–2.6 KB — roughly 12x smaller, at no cost to us.
+ *
+ * It matters because avatars come in listings, not ones and twos: 50 on
+ * /contributors, 24 per page of /repos, 32 on the homepage, 20 on a detail page.
+ * At full size that is ~1.1 MB of images on the contributors table alone.
+ *
+ * `px` is the DEVICE pixel size — pass 2x the CSS size so it stays sharp on
+ * retina. This is also why the <Image> components keep `unoptimized`: GitHub's
+ * CDN already does the resizing, so routing these through Next's optimiser would
+ * only spend our own CPU and disk cache to arrive at the same bytes.
+ *
+ * Non-GitHub hosts are returned untouched. Owners and contributors are always
+ * GitHub-hosted today, but a future import from elsewhere must not silently
+ * acquire a meaningless query parameter.
+ */
+export function githubAvatarUrl(url: string, px: number): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+
+  if (parsed.hostname !== 'avatars.githubusercontent.com') return url;
+
+  // `set` rather than `append`: these URLs already carry `?v=4` and sometimes a
+  // `u=` cache-buster, and a second `s=` would be ignored in favour of the first.
+  parsed.searchParams.set('s', String(Math.round(px)));
+  return parsed.toString();
+}
+
 /** ISO date (YYYY-MM-DD) in UTC - the key format for repository_metrics. */
 export function isoDate(date: Date = new Date()): string {
   return date.toISOString().slice(0, 10);

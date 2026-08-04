@@ -15,7 +15,14 @@ import { env } from '@/lib/env';
 import { getRenderedReadme } from '@/lib/github/readme';
 import type { RepositoryDetail } from '@/lib/queries';
 import { repositoryJsonLd } from '@/lib/seo';
-import { cn, formatCompact, formatDelta, formatNumber, formatRelativeTime } from '@/lib/utils';
+import {
+  cn,
+  formatCompact,
+  formatDelta,
+  formatNumber,
+  formatRelativeTime,
+  githubAvatarUrl,
+} from '@/lib/utils';
 
 /**
  * ISR rather than force-dynamic — the one page in the app that is cached.
@@ -240,7 +247,7 @@ function RepoHeader({ repo }: { repo: RepositoryDetail }) {
       <div className="flex flex-wrap items-start gap-4">
         {repo.ownerAvatarUrl ? (
           <Image
-            src={repo.ownerAvatarUrl}
+            src={githubAvatarUrl(repo.ownerAvatarUrl, 96)}
             alt=""
             width={48}
             height={48}
@@ -467,7 +474,7 @@ function Contributors({ repo }: { repo: RepositoryDetail }) {
               >
                 {person.avatarUrl ? (
                   <Image
-                    src={person.avatarUrl}
+                    src={githubAvatarUrl(person.avatarUrl, 48)}
                     alt=""
                     width={24}
                     height={24}

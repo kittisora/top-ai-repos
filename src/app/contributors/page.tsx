@@ -10,7 +10,7 @@ import { EmptyIndexNotice, SetupNotice } from '@/components/setup-notice';
 import { EmptyState, LinkButton } from '@/components/ui';
 import { contributorsQuerySchema } from '@/lib/api/validation';
 import type { TopContributor } from '@/lib/queries';
-import { cn, formatCompact } from '@/lib/utils';
+import { cn, formatCompact, githubAvatarUrl } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -164,7 +164,9 @@ function ContributorTable({
                 <div className="flex items-center gap-2">
                   {person.avatarUrl ? (
                     <Image
-                      src={person.avatarUrl}
+                      // 50 rows per page, so this is the heaviest avatar list in
+                      // the app: ~1.1 MB of originals versus ~95 KB at 48px.
+                      src={githubAvatarUrl(person.avatarUrl, 48)}
                       alt=""
                       width={24}
                       height={24}

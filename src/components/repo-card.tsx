@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { CategoryPill, LicenseBadge, QualityBadge, TrendBadge } from '@/components/badges';
 import type { RepoListItem } from '@/lib/queries';
-import { cn, formatCompact, formatRelativeTime } from '@/lib/utils';
+import { cn, formatCompact, formatRelativeTime, githubAvatarUrl } from '@/lib/utils';
 
 /**
  * One repository as a dense row.
@@ -49,7 +49,9 @@ export function RepoCard({
 
       {repo.ownerAvatarUrl ? (
         <Image
-          src={repo.ownerAvatarUrl}
+          // 56 = 2x the 28px it renders at, for retina. Without this GitHub
+          // serves the original upload (~22 KB) — 24 of them per page of results.
+          src={githubAvatarUrl(repo.ownerAvatarUrl, 56)}
           alt=""
           width={28}
           height={28}

@@ -1,0 +1,171 @@
+/*
+ * README rendering styles — loaded ONLY by the repository detail route.
+ *
+ * This file exists for one reason: `github-markdown-css` plus the token overrides
+ * below are 31.7 KB raw / 5.3 KB gzipped, and they were imported from globals.css,
+ * which made them render-blocking on every page in the app. They are used on
+ * exactly one route, and even there only once the user picks the README "Preview"
+ * tab. The homepage, the explorer, the category pages and /contributors were all
+ * parsing GitHub's entire markdown theme before they could paint a pixel.
+ *
+ * Importing it from readme-section.tsx makes Next emit it as that route's CSS
+ * chunk instead, still in the initial HTML for the route that needs it — so there
+ * is no flash of unstyled README — and absent everywhere else.
+ *
+ * Order matters: the @import must come first so the overrides that follow win.
+ * The `img` rule relies on class specificity rather than source order to beat
+ * Tailwind's preflight `img { display: block }`, so it is safe here.
+ */
+@import "github-markdown-css/github-markdown.css";
+
+/*
+ * Skip layout and paint for the README until it is near the viewport.
+ *
+ * This is the one place in the app where deferred rendering clearly pays: a
+ * rendered README is unbounded GitHub HTML — headings, tables, code blocks and
+ * long rows of badge images — and it sits below the quality breakdown and the
+ * star chart, so it is off-screen on load. Nothing else on the site is both this
+ * large and this reliably below the fold, which is why this is scoped here rather
+ * than applied to the repo listings (24 short rows would gain nothing and risks
+ * content jumping).
+ *
+ * `contain-intrinsic-size: auto 1200px` is the important half. The bare
+ * `content-visibility: auto` would collapse the container to zero height while
+ * unrendered and make the scrollbar lurch as you scroll into it; `auto` tells the
+ * browser to remember the real height once measured, and 1200px is the placeholder
+ * for the very first paint.
+ */
+.readme-preview {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1200px;
+}
+
+/*
+ * GitHub returns the README as sanitized `markdown-body` HTML. The imported
+ * stylesheet is generated from GitHub.com; these overrides bind its color
+ * tokens to our explicit class-based theme toggle instead of the OS setting.
+ */
+.github-readme-shell {
+  border-color: #d1d9e0;
+  background-color: #ffffff;
+}
+
+.readme-preview .markdown-body {
+  color-scheme: light;
+  --fgColor-danger: #d1242f;
+  --bgColor-attention-muted: #fff8c5;
+  --bgColor-danger-muted: #ffebe9;
+  --bgColor-default: #ffffff;
+  --bgColor-muted: #f6f8fa;
+  --bgColor-neutral-muted: #818b981f;
+  --borderColor-accent-emphasis: #0969da;
+  --borderColor-attention-emphasis: #9a6700;
+  --borderColor-danger-emphasis: #cf222e;
+  --borderColor-default: #d1d9e0;
+  --borderColor-done-emphasis: #8250df;
+  --borderColor-success-emphasis: #1a7f37;
+  --borderColor-muted: #d1d9e0b3;
+  --borderColor-neutral-muted: var(--borderColor-muted);
+  --color-prettylights-syntax-brackethighlighter-angle: #59636e;
+  --color-prettylights-syntax-brackethighlighter-unmatched: #82071e;
+  --color-prettylights-syntax-carriage-return-bg: #cf222e;
+  --color-prettylights-syntax-carriage-return-text: #f6f8fa;
+  --color-prettylights-syntax-comment: #59636e;
+  --color-prettylights-syntax-constant: #0550ae;
+  --color-prettylights-syntax-constant-other-reference-link: #0a3069;
+  --color-prettylights-syntax-entity: #6639ba;
+  --color-prettylights-syntax-entity-tag: #0550ae;
+  --color-prettylights-syntax-invalid-illegal-bg: var(--bgColor-danger-muted);
+  --color-prettylights-syntax-invalid-illegal-text: var(--fgColor-danger);
+  --color-prettylights-syntax-keyword: #cf222e;
+  --color-prettylights-syntax-markup-bold: #1f2328;
+  --color-prettylights-syntax-markup-changed-bg: #ffd8b5;
+  --color-prettylights-syntax-markup-changed-text: #953800;
+  --color-prettylights-syntax-markup-deleted-bg: #ffebe9;
+  --color-prettylights-syntax-markup-deleted-text: #82071e;
+  --color-prettylights-syntax-markup-heading: #0550ae;
+  --color-prettylights-syntax-markup-ignored-bg: #0550ae;
+  --color-prettylights-syntax-markup-ignored-text: #d1d9e0;
+  --color-prettylights-syntax-markup-inserted-bg: #dafbe1;
+  --color-prettylights-syntax-markup-inserted-text: #116329;
+  --color-prettylights-syntax-markup-italic: #1f2328;
+  --color-prettylights-syntax-markup-list: #3b2300;
+  --color-prettylights-syntax-meta-diff-range: #8250df;
+  --color-prettylights-syntax-storage-modifier-import: #1f2328;
+  --color-prettylights-syntax-string: #0a3069;
+  --color-prettylights-syntax-string-regexp: #116329;
+  --color-prettylights-syntax-sublimelinter-gutter-mark: #818b98;
+  --color-prettylights-syntax-variable: #953800;
+  --fgColor-accent: #0969da;
+  --fgColor-attention: #9a6700;
+  --fgColor-default: #1f2328;
+  --fgColor-done: #8250df;
+  --fgColor-muted: #59636e;
+  --fgColor-success: #1a7f37;
+  --focus-outlineColor: var(--borderColor-accent-emphasis);
+}
+
+.dark .github-readme-shell {
+  border-color: #3d444d;
+  background-color: #0d1117;
+}
+
+.dark .readme-preview .markdown-body {
+  color-scheme: dark;
+  --fgColor-accent: #4493f8;
+  --bgColor-attention-muted: #bb800926;
+  --bgColor-danger-muted: #490202;
+  --bgColor-default: #0d1117;
+  --bgColor-muted: #151b23;
+  --bgColor-neutral-muted: #656c7633;
+  --borderColor-accent-emphasis: #1f6feb;
+  --borderColor-attention-emphasis: #9e6a03;
+  --borderColor-danger-emphasis: #da3633;
+  --borderColor-default: #3d444d;
+  --borderColor-done-emphasis: #8957e5;
+  --borderColor-success-emphasis: #238636;
+  --borderColor-muted: #3d444db3;
+  --borderColor-neutral-muted: var(--borderColor-muted);
+  --color-prettylights-syntax-brackethighlighter-angle: #9198a1;
+  --color-prettylights-syntax-brackethighlighter-unmatched: #f85149;
+  --color-prettylights-syntax-carriage-return-bg: #b62324;
+  --color-prettylights-syntax-carriage-return-text: #f0f6fc;
+  --color-prettylights-syntax-comment: #9198a1;
+  --color-prettylights-syntax-constant: #79c0ff;
+  --color-prettylights-syntax-constant-other-reference-link: #a5d6ff;
+  --color-prettylights-syntax-entity: #d2a8ff;
+  --color-prettylights-syntax-entity-tag: #7ee787;
+  --color-prettylights-syntax-invalid-illegal-bg: var(--bgColor-danger-muted);
+  --color-prettylights-syntax-invalid-illegal-text: var(--fgColor-danger);
+  --color-prettylights-syntax-keyword: #ff7b72;
+  --color-prettylights-syntax-markup-bold: #f0f6fc;
+  --color-prettylights-syntax-markup-changed-bg: #5a1e02;
+  --color-prettylights-syntax-markup-changed-text: #ffdfb6;
+  --color-prettylights-syntax-markup-deleted-bg: #67060c;
+  --color-prettylights-syntax-markup-deleted-text: #ffdcd7;
+  --color-prettylights-syntax-markup-heading: #1f6feb;
+  --color-prettylights-syntax-markup-ignored-bg: #1158c7;
+  --color-prettylights-syntax-markup-ignored-text: #f0f6fc;
+  --color-prettylights-syntax-markup-inserted-bg: #033a16;
+  --color-prettylights-syntax-markup-inserted-text: #aff5b4;
+  --color-prettylights-syntax-markup-italic: #f0f6fc;
+  --color-prettylights-syntax-markup-list: #f2cc60;
+  --color-prettylights-syntax-meta-diff-range: #d2a8ff;
+  --color-prettylights-syntax-storage-modifier-import: #f0f6fc;
+  --color-prettylights-syntax-string: #a5d6ff;
+  --color-prettylights-syntax-string-regexp: #7ee787;
+  --color-prettylights-syntax-sublimelinter-gutter-mark: #3d444d;
+  --color-prettylights-syntax-variable: #ffa657;
+  --fgColor-attention: #d29922;
+  --fgColor-danger: #f85149;
+  --fgColor-default: #f0f6fc;
+  --fgColor-done: #ab7df8;
+  --fgColor-muted: #9198a1;
+  --fgColor-success: #3fb950;
+  --focus-outlineColor: var(--borderColor-accent-emphasis);
+}
+
+/* Tailwind's reset makes images block-level; GitHub badge rows require inline images. */
+.readme-preview .markdown-body img {
+  display: inline-block;
+}

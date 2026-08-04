@@ -5,6 +5,10 @@ import { useState } from 'react';
 
 import { cn, formatNumber } from '@/lib/utils';
 
+// Route-scoped rather than global: this pulls in github-markdown-css, which is
+// only meaningful where a README is rendered. See the note in the file itself.
+import '@/styles/readme.css';
+
 type ReadmeMode = 'preview' | 'source';
 
 export function ReadmeSection({
