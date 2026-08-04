@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 
 import { Footer } from '@/components/footer';
+import { GitHubStarBadge } from '@/components/github-star-badge';
 import { Header } from '@/components/header';
 import { THEME_INIT_SCRIPT } from '@/components/theme-toggle';
 import { env } from '@/lib/env';
@@ -118,7 +119,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
 
         <div className="flex min-h-screen flex-col">
-          <Header />
+          {/* The badge is fetched here, in a server component, and handed to the
+              client-side header as a slot — see @/components/github-star-badge. */}
+          <Header starBadge={<GitHubStarBadge />} />
           {/* The header is a fixed floating pill (out of flow), so main pads its
               own top by the header's full height to clear it. Each page adds its
               own py-* on top of this, which supplies the visual gap. */}
