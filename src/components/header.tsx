@@ -4,7 +4,7 @@ import { Menu, Plus, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -25,8 +25,12 @@ const NAV = [
  *
  * A client component because the mobile menu holds open/closed state and the
  * nav highlights the current section via usePathname.
+ *
+ * `starBadge` is a slot rather than an import: the GitHub star count is fetched
+ * on the server, which a client component cannot do, so the root layout renders
+ * @/components/github-star-badge and passes the element in.
  */
-export function Header() {
+export function Header({ starBadge }: { starBadge?: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeMobile = useCallback(() => setMobileOpen(false), []);
@@ -109,9 +113,11 @@ export function Header() {
               </nav>
             </div>
 
-            {/* Actions: theme toggle on both; the CTA on desktop; the hamburger
-                on mobile. */}
+            {/* Actions: the star badge and theme toggle on both; the CTA on
+                desktop; the hamburger on mobile. */}
             <div className="flex items-center gap-1.5 md:gap-2">
+              {starBadge}
+
               <ThemeToggle />
 
               <Button

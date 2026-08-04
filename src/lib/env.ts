@@ -72,6 +72,14 @@ export const env = {
     return process.env.NEXT_PUBLIC_SITE_NAME || 'Top AI Repos';
   },
   /**
+   * This project's OWN repository as "owner/name" — the source of the site, not
+   * one of the repositories it indexes. Drives the header's star badge and the
+   * link behind it, so a fork should point it at its own repo.
+   */
+  get sourceRepo() {
+    return process.env.NEXT_PUBLIC_GITHUB_REPO || 'kittisora/top-ai-repos';
+  },
+  /**
    * Absolute site origin, no trailing slash. Drives metadataBase, canonical
    * URLs, the sitemap and robots.txt — so for SEO to work in production this
    * MUST be set to the real domain (e.g. https://ailist.dev), not localhost.

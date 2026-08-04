@@ -153,6 +153,7 @@ npm run dev               # the site at http://localhost:3000
 | `GITHUB_TOKEN` | yes | [github.com/settings/tokens](https://github.com/settings/tokens). No scopes needed — we only read public data. Raises the limit from 60 to 5,000 requests/hour. |
 | `OPENAI_API_KEY` | optional | Only used for classifying repos the rules can't place. Leave blank to run rules-only. |
 | `NEXT_PUBLIC_SITE_URL` | for deploy | The canonical origin. Drives canonical tags, the sitemap, OG images and the domain redirect. **Must** be the real domain before building, or Google indexes localhost. |
+| `NEXT_PUBLIC_GITHUB_REPO` | optional | This project's own repo as `owner/name`, for the star count in the header. Defaults to `kittisora/top-ai-repos`; point a fork at its own repo. |
 
 **Supabase connection string:** use the **Session pooler** (port 5432). The
 direct connection is IPv6-only on the free tier and fails from most networks; the
