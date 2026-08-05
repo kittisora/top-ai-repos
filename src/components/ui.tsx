@@ -144,10 +144,39 @@ export function StatTile({
   href?: string;
   emphasis?: boolean;
 }) {
-  const body = (
-    <>
+  /**
+   * ALWAYS a <div>, never an <a>, whatever `href` is.
+   *
+   * Every StatTile is a direct child of a <dl> (the homepage stat row, the
+   * category detail header). A <dl> may contain only <dt>, <dd>, <div>, <script>
+   * and <template> — so the old `href` branch, which wrapped the whole tile in a
+   * Next <Link>, put an <a> straight inside the <dl> AND buried the <dt>/<dd>
+   * inside an element that is neither a <dl> nor a <dl>-child <div>. That is both
+   * of the accessibility errors Lighthouse reported on the homepage, from one
+   * component: three of the five tiles there pass an href.
+   *
+   * The link now sits inside the <dt> and stretches over the tile with
+   * `after:inset-0`, which is the same pattern already used by RepoCard and the
+   * category cards. The hit area is identical; the accessible name actually
+   * improves, from "label value hint" run together down to just the label.
+   */
+  const linked = Boolean(href);
+
+  return (
+    <div
+      className={cn(
+        'block rounded-xl border border-secondary bg-primary px-3.5 py-3 shadow-xs transition',
+        linked && 'relative hover:border-primary hover:bg-secondary',
+      )}
+    >
       <dt className="text-[0.6875rem] font-medium uppercase tracking-wider text-quaternary">
-        {label}
+        {href ? (
+          <Link href={href} className="after:absolute after:inset-0">
+            {label}
+          </Link>
+        ) : (
+          label
+        )}
       </dt>
       <dd
         className={cn(
@@ -158,17 +187,7 @@ export function StatTile({
         {value}
       </dd>
       {hint ? <dd className="mt-0.5 text-xs text-tertiary">{hint}</dd> : null}
-    </>
-  );
-
-  const className = 'block rounded-xl border border-secondary bg-primary px-3.5 py-3 shadow-xs transition';
-
-  return href ? (
-    <Link href={href} className={cn(className, 'hover:border-primary hover:bg-secondary')}>
-      {body}
-    </Link>
-  ) : (
-    <div className={className}>{body}</div>
+    </div>
   );
 }
 

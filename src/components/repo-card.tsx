@@ -107,11 +107,19 @@ export function RepoCard({
               <CategoryPill key={c.slug} name={c.name} href={`/categories/${c.slug}`} />
             ))}
           {repo.language ? (
+            /* The visible pill stays just the language name, but the link needs
+               more than that to be a good link. Lighthouse's link-text audit keeps
+               a blocklist of non-descriptive anchor text, and a one-word language
+               name lands on it verbatim — "Go" is a literal entry. That is the
+               "Links do not have descriptive text — 2 links found" on the
+               homepage. The sr-only suffix fixes the accessible name and the
+               crawlable text at once without changing what anyone sees. */
             <Link
               href={`/repos?language=${encodeURIComponent(repo.language)}`}
               className="text-xs text-tertiary transition-colors hover:text-primary"
             >
               {repo.language}
+              <span className="sr-only"> repositories</span>
             </Link>
           ) : null}
           <LicenseBadge licenseClass={repo.licenseClass} spdxId={repo.licenseSpdxId} />
@@ -119,10 +127,19 @@ export function RepoCard({
       </div>
 
       <dl className="flex shrink-0 flex-col items-end gap-1 text-xs text-tertiary">
-        <div className="flex items-center gap-1">
-          <Star className="size-3.5 text-quaternary" aria-hidden="true" />
+        {/* The icon lives INSIDE the <dd>, not beside it. A <div> child of a <dl>
+            may contain only <dt>/<dd> (plus script/template), so an <svg> sibling
+            makes the whole list invalid — Lighthouse reports it as "<dl>'s do not
+            contain only properly-ordered <dt> and <dd> groups". Rendering is
+            unchanged: `sr-only` makes the <dt> absolutely positioned, so it never
+            occupied a slot in this flex row and the gap-1 always sat between the
+            icon and the number. */}
+        <div className="flex items-center">
           <dt className="sr-only">stars</dt>
-          <dd className="num font-semibold text-primary">{formatCompact(repo.stars)}</dd>
+          <dd className="num flex items-center gap-1 font-semibold text-primary">
+            <Star className="size-3.5 text-quaternary" aria-hidden="true" />
+            {formatCompact(repo.stars)}
+          </dd>
         </div>
 
         <div>
@@ -132,24 +149,35 @@ export function RepoCard({
           </dd>
         </div>
 
-        <div className="hidden items-center gap-2.5 sm:flex">
-          <span className="flex items-center gap-1" title={`${repo.forks} forks`}>
-            <GitFork className="size-3 text-quaternary" aria-hidden="true" />
-            <span className="num">{formatCompact(repo.forks)}</span>
-          </span>
-          <span className="flex items-center gap-1" title={`${repo.openIssues} open issues`}>
-            <CircleDot className="size-3 text-quaternary" aria-hidden="true" />
-            <span className="num">{formatCompact(repo.openIssues)}</span>
-          </span>
-          {repo.contributorsCount !== null ? (
-            <span
-              className="flex items-center gap-1"
-              title={`${repo.contributorsCount} contributors`}
-            >
-              <Users className="size-3 text-quaternary" aria-hidden="true" />
-              <span className="num">{formatCompact(repo.contributorsCount)}</span>
+        {/* This row held three bare <span>s and no <dt>/<dd> at all, which is the
+            same violation again. It hid on mobile (`hidden … sm:flex`), so axe
+            skipped it under Lighthouse's default phone emulation and it only
+            surfaced in a desktop audit — the kind of bug that looks fixed until
+            someone runs the report at a different width.
+
+            Now one name/value group: an sr-only <dt> naming the row, and a <dd>
+            that carries the flex layout the outer div used to. */}
+        <div className="hidden sm:block">
+          <dt className="sr-only">forks, open issues and contributors</dt>
+          <dd className="flex items-center gap-2.5">
+            <span className="flex items-center gap-1" title={`${repo.forks} forks`}>
+              <GitFork className="size-3 text-quaternary" aria-hidden="true" />
+              <span className="num">{formatCompact(repo.forks)}</span>
             </span>
-          ) : null}
+            <span className="flex items-center gap-1" title={`${repo.openIssues} open issues`}>
+              <CircleDot className="size-3 text-quaternary" aria-hidden="true" />
+              <span className="num">{formatCompact(repo.openIssues)}</span>
+            </span>
+            {repo.contributorsCount !== null ? (
+              <span
+                className="flex items-center gap-1"
+                title={`${repo.contributorsCount} contributors`}
+              >
+                <Users className="size-3 text-quaternary" aria-hidden="true" />
+                <span className="num">{formatCompact(repo.contributorsCount)}</span>
+              </span>
+            ) : null}
+          </dd>
         </div>
 
         <div className="hidden text-quaternary md:block">

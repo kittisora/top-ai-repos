@@ -86,13 +86,27 @@ export function QualityBreakdown({ repo }: { repo: RepositoryDetail }) {
           const value = breakdown.dimensions[dimension.key];
           const percent = Math.round(value * 100);
           return (
-            <div key={dimension.key} className="px-4 py-2.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-sm font-medium">{dimension.label}</dt>
-                <dd className="num text-xs text-tertiary">{percent}%</dd>
-              </div>
-              <div
-                className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-secondary"
+            /*
+             * Flat dt + dd + dd, because a <div> inside a <dl> may hold nothing
+             * else. Previously this row wrapped the <dt>/<dd> in a second flex
+             * <div> and sat them alongside the meter and a <p>, which tripped both
+             * of Lighthouse's definition-list rules at once: non-dt/dd content in
+             * a <dl>-child div, and dt/dd whose nearest legal ancestor was two
+             * divs down rather than the <dl> itself.
+             *
+             * A 2-column grid on the row reproduces the old
+             * `flex items-baseline justify-between` pairing of label and
+             * percentage without needing the inner div, and the meter and prose
+             * become <dd>s of the same group — which they always were in meaning.
+             */
+            <div
+              key={dimension.key}
+              className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 px-4 py-2.5"
+            >
+              <dt className="text-sm font-medium">{dimension.label}</dt>
+              <dd className="num text-xs text-tertiary">{percent}%</dd>
+              <dd
+                className="col-span-2 mt-1.5 h-1.5 overflow-hidden rounded-full bg-secondary"
                 role="meter"
                 aria-valuenow={percent}
                 aria-valuemin={0}
@@ -106,8 +120,8 @@ export function QualityBreakdown({ repo }: { repo: RepositoryDetail }) {
                   )}
                   style={{ width: `${percent}%` }}
                 />
-              </div>
-              <p className="mt-1 text-xs text-quaternary">{dimension.explains}</p>
+              </dd>
+              <dd className="col-span-2 mt-1 text-xs text-quaternary">{dimension.explains}</dd>
             </div>
           );
         })}

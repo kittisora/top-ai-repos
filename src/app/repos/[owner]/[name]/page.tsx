@@ -278,11 +278,15 @@ function RepoHeader({ repo }: { repo: RepositoryDetail }) {
             <LicenseBadge licenseClass={repo.licenseClass} spdxId={repo.licenseSpdxId} />
 
             {repo.language ? (
+              /* Same bare-language anchor as in repo-card.tsx — see the note
+                 there. Fixing only the card would leave 29,000 detail pages
+                 failing the same audit. */
               <Link
                 href={`/repos?language=${encodeURIComponent(repo.language)}`}
                 className="rounded border border-secondary px-1.5 py-0.5 text-xs text-tertiary hover:text-primary"
               >
                 {repo.language}
+                <span className="sr-only"> repositories</span>
               </Link>
             ) : null}
 
