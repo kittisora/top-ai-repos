@@ -129,3 +129,59 @@ curl --fail --head --resolve topairepos.com:443:62.238.43.103 \
 
 Do not reinstall `deploy/nginx.conf` over Certbot's managed copy afterward
 without first preserving the generated TLS directives.
+
+## 4. Scheduled jobs
+
+Three timers run alongside `top-ai-repos-deploy.timer`. Each is a `oneshot`
+service plus a timer, installed the same way as the deployer:
+
+```bash
+sudo install -m 0755 deploy/db-backup.sh   /usr/local/sbin/top-ai-repos-db-backup
+sudo install -m 0755 deploy/source-sync.sh /usr/local/sbin/top-ai-repos-source-sync
+sudo cp deploy/top-ai-repos-{db-backup,ingest,source-sync}.{service,timer} \
+  /etc/systemd/system/
+sudo install -d -o root -g root -m 0700 /var/backups/pg
+sudo systemctl daemon-reload
+sudo systemctl enable --now \
+  top-ai-repos-db-backup.timer top-ai-repos-ingest.timer top-ai-repos-source-sync.timer
+```
+
+`/var/backups/pg` must exist **before** the backup unit first starts: it is
+listed in `ReadWritePaths=`, and systemd builds that mount namespace before
+`ExecStart` runs, so the script cannot create its own destination.
+
+| Timer | Schedule | What it does |
+| --- | --- | --- |
+| `db-backup` | 04:30 UTC daily | `pg_dump -Fc` to `/var/backups/pg`, 7-day retention |
+| `ingest` | 00:00 and 12:00 UTC | `npm run daily` from `/root/top-ai-repos` |
+| `source-sync` | every 2 minutes | fast-forwards `/root/top-ai-repos` to `origin/main` |
+
+### Backups
+
+Each dump is a **complete** copy of the database, not an increment, so any one
+of them restores everything:
+
+```bash
+sudo -u postgres createdb topairepos_restore
+sudo -u postgres pg_restore --exit-on-error --single-transaction \
+  --dbname=topairepos_restore < /var/backups/pg/topairepos-YYYY-MM-DD.dump
+```
+
+The script verifies every dump with `pg_restore --list` and fails if
+`repository_metrics` is missing, because that table is the reason backups exist:
+GitHub has no historical-stars API, so a lost star snapshot cannot be re-fetched
+from anywhere. Everything else could be rebuilt with `npm run daily`.
+
+These files still live on the same disk as the database they protect. Copying
+them off-host is not yet configured, and until it is, this is not a real backup.
+
+### Why source-sync exists
+
+`deploy.sh` builds the website from its own bare clone into
+`/srv/top-ai-repos/releases`; it never touches `/root/top-ai-repos`. But the
+ingestion timer runs `npm run daily` from that checkout, so without this job the
+site would serve new code while ingestion ran whatever was last pulled by hand.
+
+It only ever fast-forwards. Uncommitted changes, a detached HEAD, a branch other
+than `main`, or local commits not yet pushed all cause it to log and exit
+without touching anything.
