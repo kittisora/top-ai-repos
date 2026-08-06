@@ -25,6 +25,13 @@ KillMode=control-group
 UMask=0027
 
 # The deployed tree is read-only except for Next.js's runtime cache.
+#
+# `.next/server/app` is deliberately NOT writable, even though `next start` wants
+# to flush the ISR prerender cache there (one directory per repo owner, created
+# on first render of /repos/<owner>/<name>). That directory also holds the built
+# page bundles, so making it writable would let the app process rewrite its own
+# code. `experimental.isrFlushToDisk: false` in next.config.ts turns those writes
+# off instead; the in-memory ISR cache is what actually serves the repeat hits.
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/srv/top-ai-repos/current/.next/cache
