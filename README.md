@@ -332,7 +332,7 @@ query params.
 ```bash
 npm run dev            # the site at http://localhost:3000
 npm run build          # production build
-npm test               # 62 unit tests (taxonomy, scoring, geo, filters)
+npm test               # 76 unit tests (taxonomy, scoring, geo, filters, cache, utils)
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint (next build no longer lints)
 
@@ -416,6 +416,18 @@ Dropdowns with more than ten options grow a search box automatically.
 - Everything here is discovered from GitHub's own API. No other directory's data
   or ranking is copied.
 
+## Contributing
+
+Contributions are welcome — [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, the
+conventions, and the four non-obvious things about the ingestion pipeline that
+will otherwise bite you.
+
+Found a security issue? Please don't open a public issue — see
+[SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT
+[Apache License 2.0](LICENSE). Copyright 2026 Kittipong Sorasuchart.
+
+The indexed repositories are not covered by this licence; each carries its own
+terms, which is exactly what the quality score's licence check is about.
