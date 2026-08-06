@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the Top AI Repos database backup nightly
+Documentation=https://github.com/kittisora/top-ai-repos
+
+[Timer]
+# 04:30 UTC — after the nightly ingestion has settled, before daytime traffic.
+OnCalendar=*-*-* 04:30:00 UTC
+# Catch up if the VPS was off at 04:30 rather than silently skipping a day.
+Persistent=true
+RandomizedDelaySec=5min
+AccuracySec=1min
+Unit=top-ai-repos-db-backup.service
+
+[Install]
+WantedBy=timers.target
