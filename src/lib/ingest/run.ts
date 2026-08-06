@@ -13,6 +13,7 @@
 import { eq, sql } from 'drizzle-orm';
 
 import { db, syncRuns } from '@/db';
+import { describeError } from '@/lib/errors';
 
 /** Anything a job wants to report. jsonb, so keep it flat and primitive. */
 export type JobStats = Record<string, number | string>;
@@ -29,15 +30,12 @@ function stamp(): string {
 }
 
 /**
- * Truncated because `error` is a plain text column and a driver stack trace
- * from a 2,000-repo run can be tens of kilobytes of noise.
+ * `error` is a plain text column and a driver stack trace from a 2,000-repo run
+ * can be tens of kilobytes of noise, so the stored description is capped. See
+ * describeError: the cause chain is written before the stack, so the cap eats
+ * the stack rather than the diagnosis.
  */
-function describeError(error: unknown): string {
-  if (error instanceof Error) {
-    return `${error.name}: ${error.message}\n${error.stack ?? ''}`.slice(0, 8_000);
-  }
-  return String(error).slice(0, 8_000);
-}
+const ERROR_LIMIT = 8_000;
 
 export async function withRun<T extends JobStats>(
   job: string,
@@ -79,7 +77,7 @@ export async function withRun<T extends JobStats>(
         .set({
           status: 'error',
           finishedAt: sql`now()`,
-          error: describeError(error),
+          error: describeError(error, ERROR_LIMIT),
           stats: { durationSeconds: seconds },
         })
         .where(eq(syncRuns.id, runId));

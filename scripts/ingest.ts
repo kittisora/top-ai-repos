@@ -12,6 +12,7 @@ import {
   withRun,
 } from '@/lib/ingest';
 import { env } from '@/lib/env';
+import { errorFacts } from '@/lib/errors';
 import { daysAgoIso } from '@/lib/utils';
 import { flag, main, numArg } from './cli';
 
@@ -127,10 +128,10 @@ await main(async () => {
       await withRun(stage.name, ({ log }) => stage.run(log));
     } catch (error) {
       failures.push(stage.name);
-      console.error(
-        `stage ${stage.name} failed:`,
-        error instanceof Error ? error.message : String(error),
-      );
+      // Not `error.message`: for a drizzle query failure that is the entire SQL
+      // statement, and the reason is one level down in `error.cause`.
+      console.error(`stage ${stage.name} failed:`);
+      console.error(errorFacts(error).join('\n'));
     }
   }
 
