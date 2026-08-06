@@ -265,7 +265,9 @@ function RepoHeader({ repo }: { repo: RepositoryDetail }) {
               className="hover:text-brand-secondary"
             >
               <span className="text-tertiary">{repo.ownerLogin}/</span>
-              <span className="break-all">{repo.name}</span>
+              {/* break-words, not break-all: only split the name when it genuinely
+                  cannot fit, instead of breaking mid-word at every opportunity. */}
+              <span className="break-words">{repo.name}</span>
             </a>
           </h1>
 
@@ -326,7 +328,16 @@ function RepoHeader({ repo }: { repo: RepositoryDetail }) {
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        {/* w-full below sm is load-bearing, not cosmetic. The heading beside
+            these buttons is a `flex-1` item, so its flex-basis is 0 and the
+            wrap calculation acts as though it needs no room at all: these
+            shrink-0 buttons keep their ~320px and the heading is left with
+            whatever remains. At 412px wide — a stock Samsung viewport — that
+            was 22px, which renders the repo name one character per line.
+            Claiming the full row makes the buttons wrap beneath the heading
+            instead. Below ~390px the buttons overflowed on their own, which
+            forced the wrap by accident and hid the bug on narrow phones. */}
+        <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
           <LinkButton
             href={`https://github.com/${repo.fullName}`}
             variant="primary"
