@@ -8,7 +8,7 @@ import { FilterSelect } from '@/components/filter-select';
 import type { CategoryGroupStats, CountryStat } from '@/lib/queries';
 
 /**
- * The contributors filter row, on Untitled UI Select / Button.
+ * The contributors filter row, on  Select / Button.
  *
  * react-aria's Select is not a native form field, so — exactly like the
  * explorer's filter sidebar — this is a client component that gathers state and

@@ -22,7 +22,7 @@ const config = [
   ...coreWebVitals,
   ...nextTypescript,
   {
-    // These directories are upstream Untitled UI source kept verbatim. Lint
+    // These directories are upstream  source kept verbatim. Lint
     // the product components that consume them, but do not make releases
     // depend on rewriting vendored internals for each React lint-rule update.
     rules: {

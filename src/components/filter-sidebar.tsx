@@ -17,7 +17,7 @@ import type { CategoryGroupStats, CountryStat, LanguageStat } from '@/lib/querie
 import { cn, formatCompact } from '@/lib/utils';
 
 /**
- * The explorer's filter panel, built on Untitled UI Select / Checkbox / Input /
+ * The explorer's filter panel, built on  Select / Checkbox / Input /
  * Button.
  *
  * react-aria controls are not native form fields, so this is a client component

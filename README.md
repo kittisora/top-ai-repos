@@ -97,7 +97,7 @@ terminal — and the process exits non-zero so a scheduler notices.
 ```
 GitHub Search API ──┐
 GitHub GraphQL  ────┼──▶  ingestion workers  ──▶  Postgres  ──▶  Next.js UI
-user submissions ───┘        (tsx scripts)         (Drizzle)      (Untitled UI)
+user submissions ───┘        (tsx scripts)         (Drizzle)      
                                    │
                                    └──▶ OpenAI (classification fallback)
 ```
@@ -380,9 +380,9 @@ src/
     index.ts        database client (pg Pool)
   app/              Next.js App Router pages, API routes, sitemap, robots, OG
   components/
-    base/           vendored Untitled UI primitives (react-aria)
-    application/    vendored Untitled UI composites
-  styles/           Untitled UI theme + typography tokens
+    base/           vendored primitives (react-aria)
+    application/    vendored composites
+  styles/            theme + typography tokens
 scripts/            CLI entry points for the workers
 drizzle/            generated SQL migrations (checked in)
 ```
@@ -392,7 +392,7 @@ and dependency-free — they hold the product's opinions, so they are the parts 
 must be readable and testable without a database.
 
 The UI is built on **Untitled UI** (React Aria). Every interactive control —
-buttons, badges, dropdowns, inputs, checkboxes — is an Untitled UI component;
+buttons, badges, dropdowns, inputs, checkboxes — is an  component;
 there are no native `<select>`/`<input>` elements outside the vendored tree.
 Dropdowns with more than ten options grow a search box automatically.
 

@@ -8,7 +8,7 @@ import type { LicenseClass } from '@/lib/scoring';
 // QualityBadge
 // ---------------------------------------------------------------------------
 
-/** The A–F ramp mapped onto Untitled UI badge colours. */
+/** The A–F ramp mapped onto  badge colours. */
 const GRADE_COLOR: Record<string, 'success' | 'blue' | 'warning' | 'orange' | 'error'> = {
   A: 'success',
   B: 'blue',

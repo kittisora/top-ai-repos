@@ -8,7 +8,7 @@ type ButtonIcon = FC<{ className?: string }> | ReactNode;
 
 /**
  * The small shared vocabulary every page is built from, styled with the
- * Untitled UI design tokens (text-primary/secondary/tertiary, bg-primary/
+ *  design tokens (text-primary/secondary/tertiary, bg-primary/
  * secondary, border-secondary, bg-brand-solid, …). Deliberately one file: these
  * are twenty-line presentational pieces and splitting them across a dozen
  * modules would cost more in import noise than it buys.
@@ -67,7 +67,7 @@ const BUTTON_BASE =
   'transition duration-100 ease-linear disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
- * Untitled UI button looks as plain className strings, because most call sites
+ *  button looks as plain className strings, because most call sites
  * apply them to native <button>/<Link> elements (and add sizing like `h-8`).
  */
 export const buttonStyles = {
@@ -85,7 +85,7 @@ export const buttonStyles = {
   ),
 } as const;
 
-/** Our three variants map onto Untitled UI Button colours. */
+/** Our three variants map onto  Button colours. */
 const VARIANT_COLOR = {
   primary: 'primary',
   secondary: 'secondary',

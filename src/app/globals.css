@@ -1,5 +1,4 @@
 @import "tailwindcss";
-/* Untitled UI design system: token theme + typography scale. */
 @import "../styles/theme.css";
 @import "../styles/typography.css";
 
@@ -10,7 +9,6 @@
 /*
  * The neutral ramp — the single knob that sets the whole theme's temperature.
  *
- * Untitled UI's theme.css never defines `--color-neutral-*`; it just references
  * it, so the values fall through to Tailwind's default `neutral`, which is a
  * pure hueless grey. In dark mode that made every surface a flat near-black
  * (neutral-950 is ~#0A0A0A) and the page read as a void.
@@ -66,7 +64,7 @@
   transition-timing-function: inherit;
 }
 
-/* Untitled UI base resets (native control chrome its components assume gone). */
+/*  base resets (native control chrome its components assume gone). */
 details summary::-webkit-details-marker {
   display: none;
 }

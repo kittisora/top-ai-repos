@@ -33,7 +33,7 @@ export default function LoadingHome() {
           {env.siteName} tracks AI repositories on GitHub and answers two different questions
           about each one: is it moving right now, and would you bet a product on it.
         </p>
-        {/* h-11 is the Untitled UI `md` input height, which is what SearchInput
+        {/* h-11 is the  `md` input height, which is what SearchInput
             renders. Deliberately NOT the real <SearchInput>: it holds its own
             input state, and swapping the fallback out would discard anything the
             visitor had already typed. */}
