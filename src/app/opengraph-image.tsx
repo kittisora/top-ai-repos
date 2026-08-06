@@ -38,7 +38,6 @@ export default async function OpengraphImage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoSrc} width={104} height={104} alt="" style={{ borderRadius: '22px' }} />
           <span style={{ fontSize: 64, fontWeight: 700, letterSpacing: '-0.02em' }}>
             {env.siteName}
