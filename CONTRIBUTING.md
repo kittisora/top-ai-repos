@@ -72,12 +72,6 @@ the code — a constraint of the GitHub API, a Postgres behaviour, a decision th
 looks wrong until you know what it prevents. A comment restating the line below it
 will be asked about in review.
 
-**UI is Untitled UI (React Aria).** Every interactive control — buttons, badges,
-dropdowns, inputs, checkboxes — comes from the vendored tree in
-`src/components/base/` and `src/components/application/`. There are no native
-`<select>` or `<input>` elements outside it. Don't add a dependency for something
-the vendored components already do.
-
 **Numbers are tabular.** Use the `num` class anywhere digits are stacked in a
 column, so they line up down the page.
 
