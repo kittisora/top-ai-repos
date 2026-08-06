@@ -1,0 +1,34 @@
+[Unit]
+Description=Fast-forward the VPS working copy to origin/main
+Documentation=https://github.com/kittisora/top-ai-repos
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /usr/local/sbin/top-ai-repos-source-sync
+TimeoutStartSec=15min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+# ProtectHome is deliberately NOT set: the checkout being updated lives in /root.
+# This is why the job is a separate unit rather than a step inside deploy.sh,
+# whose service runs with ProtectHome=true and could not write here.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=/root
+Environment=NPM_CONFIG_UPDATE_NOTIFIER=false
+Environment=NEXT_TELEMETRY_DISABLED=1
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native

@@ -170,10 +170,17 @@ export async function backfillContributors(
 /**
  * Upsert the people, then the repo↔person links.
  *
- * `contributors` is unique on BOTH github_id and login. A login can move to a
- * different account, so any row holding a login that a different github_id is
- * about to claim gets its login tombstoned first — otherwise the whole chunk
- * fails on the login index rather than just that row.
+ * `contributors` is unique on BOTH github_id and login, and the login index is
+ * the awkward one. Two separate things can collide on it, and they need
+ * different remedies:
+ *
+ *   1. A login that MOVED to a different account. The row still holding it gets
+ *      tombstoned to `login:github_id` first, so the claimant can take it.
+ *      Without that the whole chunk fails on the login index, not just that row.
+ *   2. One login arriving under TWO account ids in the same batch, which GitHub
+ *      really does do for bot accounts. No tombstoning can help here — the
+ *      conflict is inside the INSERT — so the batch is collapsed per login
+ *      before it is written, and the link rows are redirected onto the survivor.
  */
 async function persistPeople(collected: RepoPeople[]): Promise<{ people: number; links: number }> {
   const byGithubId = new Map<number, Person>();
@@ -183,19 +190,54 @@ async function persistPeople(collected: RepoPeople[]): Promise<{ people: number;
     }
   }
 
-  const people = [...byGithubId.values()];
+  // GitHub does not guarantee one login per account id. Every Copilot bot
+  // installation reports login "Copilot" under its own account id — 223556219
+  // and 198982749 both do today — so deduplicating by github_id alone leaves two
+  // rows claiming one login in the same INSERT, and `contributors_login_uq`
+  // rejects the whole chunk. Tombstoning cannot rescue that: the conflict is
+  // INSIDE the statement, not against a pre-existing row.
+  //
+  // Collapse per login, and remember what folded into what so the link rows
+  // still land on the survivor. Sorting first means a winner is never itself a
+  // loser, so no merge chains.
+  //
+  // The winner is the LOWEST github_id, not the one with the most contributions.
+  // Contribution counts move every run, so picking on them lets the survivor
+  // alternate between two bot ids from night to night — each run tombstoning the
+  // other and leaving repos displaying a contributor called "Copilot:223556219".
+  // These duplicates are the same logical bot, so a stable choice beats a
+  // "better" one.
+  const ordered = [...byGithubId.values()].sort((a, b) => a.githubId - b.githubId);
+  const keptByLogin = new Map<string, Person>();
+  const mergedInto = new Map<number, number>();
+  for (const person of ordered) {
+    const kept = keptByLogin.get(person.login);
+    if (kept === undefined) keptByLogin.set(person.login, person);
+    else mergedInto.set(person.githubId, kept.githubId);
+  }
+
+  const people = [...keptByLogin.values()];
   if (people.length === 0) return { people: 0, links: 0 };
 
   const idByGithubId = new Map<number, number>();
 
   for (const batch of chunk(people, WRITE_CHUNK)) {
-    const logins = batch.map((person) => person.login);
-    const ids = batch.map((person) => person.githubId);
+    // Tombstone every row holding a login that a DIFFERENT github_id is about to
+    // claim. Pairing each login with its claimant matters: the previous blanket
+    // `github_id not in (batch ids)` skipped rows that are themselves in this
+    // batch, so a login moving BETWEEN two accounts that both appear here — the
+    // rename case this guard exists for — slipped straight through to a unique
+    // violation.
+    const claims = sql.join(
+      batch.map((person) => sql`(${person.login}::text, ${person.githubId}::bigint)`),
+      sql`, `,
+    );
 
     await db.execute(sql`
-      update contributors
-      set login = login || ':' || github_id::text
-      where login in ${logins} and github_id not in ${ids}
+      update contributors c
+      set login = c.login || ':' || c.github_id::text
+      from (values ${claims}) as v(login, github_id)
+      where c.login = v.login and c.github_id <> v.github_id
     `);
 
     const rows = await db
@@ -219,14 +261,31 @@ async function persistPeople(collected: RepoPeople[]): Promise<{ people: number;
     for (const row of rows) idByGithubId.set(row.githubId, row.id);
   }
 
-  // Link rows. Resolved through idByGithubId, never zipped by position.
-  const links = collected.flatMap((entry) =>
-    entry.people.flatMap(({ person, contributions, rank }) => {
-      const contributorId = idByGithubId.get(person.githubId);
-      if (contributorId === undefined) return [];
-      return [{ repositoryId: entry.repositoryId, contributorId, contributions, rank }];
-    }),
-  );
+  // Link rows. Resolved through idByGithubId, never zipped by position, and
+  // through mergedInto first so a folded bot account still links to the survivor.
+  //
+  // Keyed by repository+contributor because that folding can put one surviving
+  // account on the same repo twice (two Copilot ids among its contributors).
+  // Upserting both in one statement would trip "ON CONFLICT DO UPDATE command
+  // cannot affect row a second time", so keep the strongest row per pair.
+  const bestLinks = new Map<
+    string,
+    { repositoryId: number; contributorId: number; contributions: number; rank: number }
+  >();
+  for (const entry of collected) {
+    for (const { person, contributions, rank } of entry.people) {
+      const githubId = mergedInto.get(person.githubId) ?? person.githubId;
+      const contributorId = idByGithubId.get(githubId);
+      if (contributorId === undefined) continue;
+
+      const key = `${entry.repositoryId}:${contributorId}`;
+      const existing = bestLinks.get(key);
+      if (existing === undefined || contributions > existing.contributions) {
+        bestLinks.set(key, { repositoryId: entry.repositoryId, contributorId, contributions, rank });
+      }
+    }
+  }
+  const links = [...bestLinks.values()];
 
   let linkCount = 0;
   for (const batch of chunk(links, WRITE_CHUNK)) {

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check every two minutes whether origin/main has moved
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Unit=top-ai-repos-source-sync.service
+
+[Install]
+WantedBy=timers.target

@@ -244,7 +244,12 @@ function TrendingSection({
   icon?: React.ReactNode;
 }) {
   return (
-    <section aria-label={title}>
+    // min-w-0 because this is a grid item, and grid items default to
+    // `min-width: auto` — they refuse to shrink below their content's
+    // min-content width. The repo rows inside contain non-wrapping runs (the
+    // trend badge is whitespace-nowrap), so the track was forced to 370px
+    // inside a 328px column and the whole page scrolled sideways on a phone.
+    <section aria-label={title} className="min-w-0">
       <SectionHeader
         title={title}
         subtitle={subtitle}

@@ -10,7 +10,7 @@ import { EmptyIndexNotice, SetupNotice } from '@/components/setup-notice';
 import { EmptyState, LinkButton } from '@/components/ui';
 import { contributorsQuerySchema } from '@/lib/api/validation';
 import type { TopContributor } from '@/lib/queries';
-import { cn, formatCompact, githubAvatarUrl } from '@/lib/utils';
+import { formatCompact, githubAvatarUrl } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 

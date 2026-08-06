@@ -32,7 +32,6 @@ import {
   repositories,
   repositoryCategories,
   repositoryContributors,
-  repositoryMetrics,
 } from '@/db/schema';
 import { classifyLicense, type LicenseClass } from '@/lib/scoring';
 import { daysAgoIso, isoDate } from '@/lib/utils';

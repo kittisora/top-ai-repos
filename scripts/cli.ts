@@ -13,6 +13,7 @@
  */
 
 import { pool } from '@/db';
+import { errorFacts } from '@/lib/errors';
 
 const args = process.argv.slice(2);
 
@@ -61,12 +62,20 @@ export async function finish(code = 0): Promise<never> {
   process.exit(code);
 }
 
-/** Run a script body, report the failure legibly, and always exit cleanly. */
+/**
+ * Run a script body, report the failure legibly, and always exit cleanly.
+ *
+ * The cause chain is printed BEFORE the stack. Printing `error.stack` alone —
+ * which this used to do — hides the reason entirely for any drizzle query error:
+ * the message is the whole SQL statement and the actual Postgres error lives in
+ * `error.cause`, which never appears when a string is what gets logged.
+ */
 export async function main(body: () => Promise<void>): Promise<never> {
   try {
     await body();
   } catch (error) {
-    console.error(error instanceof Error ? (error.stack ?? error.message) : error);
+    console.error(errorFacts(error).join('\n'));
+    if (error instanceof Error && error.stack) console.error(error.stack);
     return finish(1);
   }
   return finish(0);
