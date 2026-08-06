@@ -1,0 +1,21 @@
+[Unit]
+Description=Run the Top AI Repos ingestion pipeline twice daily
+Documentation=https://github.com/kittisora/top-ai-repos
+
+[Timer]
+OnCalendar=*-*-* 00:00:00 UTC
+OnCalendar=*-*-* 12:00:00 UTC
+
+# `snapshot` writes one star-count row per repo per calendar day, and GitHub has
+# no historical-stars API — a day that is never ingested is a permanent hole in
+# the trend charts. Catch up a missed run rather than skipping it.
+Persistent=true
+
+# Nothing depends on the exact second, and starting a few minutes off the hour
+# keeps this away from every other cron-shaped job that fires at 00:00.
+RandomizedDelaySec=3min
+AccuracySec=1min
+Unit=top-ai-repos-ingest.service
+
+[Install]
+WantedBy=timers.target

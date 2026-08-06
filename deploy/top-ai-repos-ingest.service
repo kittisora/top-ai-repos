@@ -1,0 +1,35 @@
+[Unit]
+Description=Top AI Repos ingestion pipeline (npm run daily)
+Documentation=https://github.com/kittisora/top-ai-repos
+Wants=network-online.target
+After=network-online.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/top-ai-repos
+ExecStart=/usr/bin/npm run daily
+
+# The pipeline is API-bound, not CPU-bound: the GitHub client's rate limiter
+# parks the process until the hourly budget resets, so a single run can sit idle
+# for a long stretch and still be healthy. The timeout has to allow for that.
+TimeoutStartSec=3h
+
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=NPM_CONFIG_UPDATE_NOTIFIER=false
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# The web app and two unrelated PM2 apps share this 3.8 GB box. Cap the heap so
+# an ingestion run cannot push the site into swap.
+Environment=NODE_OPTIONS=--max-old-space-size=1536
+
+# Yield to the web server: this is background work with no user waiting on it.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+MemoryHigh=1500M
+MemoryMax=2500M
+OOMPolicy=stop
+
+[Install]
+WantedBy=multi-user.target
