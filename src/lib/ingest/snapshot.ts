@@ -6,11 +6,26 @@
  * roughly 0.4% capture, so this table is the only place growth data can come
  * from — and it cannot be backfilled after the fact. A missed day is gone.
  *
- * CHANGE-ONLY STORAGE. Writing a row for every repo every day is ~95% waste:
- * measured over a real two-day window, only 4.5% of 29k repos moved at all, and
- * a full daily snapshot costs ~5.7 MB/day (≈170 MB/month, which overruns a
- * 500 MB database in weeks). So a row is written only when something actually
- * differs from the repo's most recent snapshot.
+ * CHANGE-ONLY STORAGE. A row is written only when something actually differs
+ * from the repo's most recent snapshot, rather than one row per repo per day.
+ *
+ * The original measurement behind this — "only 4.5% of 29k repos moved over a
+ * real two-day window" — is SUPERSEDED and must not be used for sizing. It was
+ * taken when `sync` was the only thing refreshing counters, and it could reach
+ * ~1,500 of 24.5k repos per run: the other 94% physically could not show
+ * movement, so the figure measured sync's rotation rate, not how often repos
+ * actually move. The `metrics` stage now refreshes every active repo
+ * immediately before this one, so the observed rate rises to the real one.
+ *
+ * Expect ~12-17k rows/day, against a HARD ceiling of one row per active repo
+ * per day (~24.5k rows, ~4 MB/day, ~1.5 GB/year at the measured 165 B/row).
+ * The ceiling is guaranteed by the (repository_id, recorded_on) primary key and
+ * the upsert below, which is also why running the pipeline twice daily cannot
+ * double it. That is comfortable against present headroom, but note there is no
+ * retention or pruning of repository_metrics anywhere — growth is monotonic.
+ *
+ * Change-only storage is worth MORE now, not less: with fresh inputs the naive
+ * dense scheme would write the full 24.5k rows every single day.
  *
  * That is safe because "no row" carries a precise meaning: the values did not
  * change since the last recorded row. Every read here asks for "the most recent
@@ -117,10 +132,12 @@ export async function snapshot(options: SnapshotOptions = {}): Promise<SnapshotS
  * UPDATE writes a new row version, and because stars_day and stars_week are both
  * indexed the update is never HOT-eligible, so all 16 indexes on `repositories`
  * (two of them GIN) take a write per row. Unfiltered, this statement rewrote the
- * whole active table every single day — ~30k rows for the ~4.5% that actually
+ * whole active table every single day on behalf of the minority that actually
  * moved — which is also where most of the dead space that `db:vacuum` reclaims
- * came from. The deltas are NOT NULL with a default, and the right-hand
- * expressions are COALESCE-guarded, so plain `<>` cannot be tripped by a NULL.
+ * came from. (The "~4.5% moved" figure this filter was originally sized against
+ * is superseded; see the note at the top of the file.) The deltas are NOT NULL
+ * with a default, and the right-hand expressions are COALESCE-guarded, so plain
+ * `<>` cannot be tripped by a NULL.
  */
 async function recomputeDeltas(today: string): Promise<number> {
   const from = new Date(`${today}T00:00:00Z`);

@@ -22,6 +22,7 @@ export type {
   GraphRepo,
   RateLimitState,
   RepoLookupResult,
+  RepoMetrics,
   SearchOptions,
   SearchRepoItem,
   SearchResult,

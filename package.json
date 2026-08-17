@@ -24,6 +24,7 @@
     "add": "tsx scripts/add.ts",
     "discover": "tsx scripts/discover.ts",
     "sync": "tsx scripts/sync.ts",
+    "metrics": "tsx scripts/metrics.ts",
     "snapshot": "tsx scripts/snapshot.ts",
     "classify": "tsx scripts/classify.ts",
     "score": "tsx scripts/score.ts",

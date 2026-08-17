@@ -3,13 +3,16 @@ import { chunk, mapLimit, sleep } from '@/lib/utils';
 import { GitHubError, GitHubTooHeavyError } from './errors';
 import {
   buildAliasedRepoQuery,
+  buildNodesMetricsQuery,
   buildNodesQuery,
   README_ALIASES,
   type GqlAliasedRepoResponse,
   type GqlError,
+  type GqlMetricsNodesResponse,
   type GqlNodesResponse,
   type GqlRateLimit,
   type GqlRepo,
+  type GqlRepoMetrics,
 } from './queries';
 import {
   primaryResetMs,
@@ -27,6 +30,7 @@ import type {
   GraphRepo,
   RateLimitState,
   RepoLookupResult,
+  RepoMetrics,
   SearchOptions,
   SearchRepoItem,
   SearchResult,
@@ -69,6 +73,17 @@ const REST_TIMEOUT_MS = 20_000;
  */
 const GRAPHQL_BATCH_WITH_README = 10;
 const GRAPHQL_BATCH_PLAIN = 50;
+
+/**
+ * The counters-only query carries no releases, topics or blobs, so it answers
+ * far inside the timeout: 50 ids measured at 2.09-2.31s TTFB for 1 point on
+ * 2026-08-17, against the 9s budget. 100 also works (3.37-3.96s, 2 points) and
+ * is GitHub's hard ceiling for `nodes(ids:)` — 101 is rejected with
+ * ARGUMENT_LIMIT — but sitting on the ceiling leaves splitOrGiveUp no room to
+ * halve into a legal batch, and doubles the cost for the same throughput. 50
+ * keeps ~75% of the timeout as headroom for a bad afternoon.
+ */
+const GRAPHQL_BATCH_METRICS = 50;
 
 /**
  * The Link-header contributor count saturates BELOW 500 (GitHub resolves only
@@ -290,8 +305,29 @@ function toGraphRepo(repo: GqlRepo): GraphRepo {
   };
 }
 
+function toRepoMetrics(repo: GqlRepoMetrics): RepoMetrics {
+  return {
+    nodeId: repo.id,
+    githubId: repo.databaseId ?? null,
+    stars: repo.stargazerCount,
+    forks: repo.forkCount,
+    openIssues: repo.openIssues?.totalCount ?? 0,
+    watchers: repo.watchers?.totalCount ?? 0,
+  };
+}
+
 function isGqlRepo(value: unknown): value is GqlRepo {
   return typeof value === 'object' && value !== null && 'nameWithOwner' in value;
+}
+
+/**
+ * `nameWithOwner` is not in the metrics selection set, so isGqlRepo cannot be
+ * reused here. `stargazerCount` is the discriminator: `nodes(ids:)` is typed
+ * `[Node]`, so a non-Repository id (a user, a gist) resolves to a bare
+ * `{__typename}` with none of the fragment's fields.
+ */
+function isGqlRepoMetrics(value: unknown): value is GqlRepoMetrics {
+  return typeof value === 'object' && value !== null && 'stargazerCount' in value;
 }
 
 function isResourceLimited(errors: GqlError[]): boolean {
@@ -647,11 +683,39 @@ export class GitHubClient {
       if (res.status === 502 || res.status === 503 || res.status === 504) {
         throw new GitHubTooHeavyError(res.status, 'server timeout — halve the batch', GRAPHQL_URL);
       }
-      if (!res.ok) throw new GitHubError(res.status, await readMessage(res), GRAPHQL_URL);
 
-      // HTTP 200 does NOT mean success: primary-limit exhaustion, the Sept-2025
-      // resource limiter and per-alias failures all arrive as 200.
-      const body = (await res.json()) as { data?: T | null; errors?: GqlError[] };
+      /**
+       * The abort signal outlives the response HEADERS. `request` converts a
+       * timeout during fetch() into GitHubTooHeavyError so the caller halves
+       * the batch, but a query whose headers arrive just inside the 9s budget
+       * and whose BODY read crosses it aborts here instead — outside that
+       * try/catch, as a bare AbortError. splitOrGiveUp rethrows anything that
+       * is not GitHubTooHeavyError, so such a batch was never halved: it
+       * propagated to fetchBatchIsolated, which logged a fallback to REST and
+       * returned []. For sync that is survivable (it really does have a REST
+       * fallback); for the metrics sweep, which deliberately has none, the
+       * whole batch simply vanished into `missing`. Converting it here puts
+       * both reads back on the halve-and-retry path the fetch phase already
+       * uses.
+       */
+      let body: { data?: T | null; errors?: GqlError[] };
+      try {
+        if (!res.ok) throw new GitHubError(res.status, await readMessage(res), GRAPHQL_URL);
+
+        // HTTP 200 does NOT mean success: primary-limit exhaustion, the Sept-2025
+        // resource limiter and per-alias failures all arrive as 200.
+        body = (await res.json()) as { data?: T | null; errors?: GqlError[] };
+      } catch (error) {
+        if (isAbort(error)) {
+          throw new GitHubTooHeavyError(
+            0,
+            `client timeout after ${GRAPHQL_TIMEOUT_MS}ms (during body read)`,
+            GRAPHQL_URL,
+          );
+        }
+        throw error;
+      }
+
       const errors = body.errors ?? [];
 
       if (isResourceLimited(errors)) {
@@ -705,10 +769,10 @@ export class GitHubClient {
    * (401 / permission 403) is rethrown — that is not a per-batch problem and
    * should stop the run rather than silently degrade every batch to REST.
    */
-  private async fetchBatchIsolated(
+  private async fetchBatchIsolated<R>(
     size: number,
-    run: () => Promise<GraphRepo[]>,
-  ): Promise<GraphRepo[]> {
+    run: () => Promise<R[]>,
+  ): Promise<R[]> {
     try {
       return await run();
     } catch (error) {
@@ -720,6 +784,42 @@ export class GitHubClient {
           (error instanceof Error ? error.message : String(error)),
       );
       return [];
+    }
+  }
+
+  /**
+   * Bulk COUNTERS by node ID — stars, forks, open issues, watchers, nothing
+   * else. The metrics sweep's transport.
+   *
+   * Separate from getReposByNodeIds because the selection set, not the batch
+   * size, is what makes a full-table sweep affordable: see the RepoMetrics
+   * fragment for the measurements. Shares fetchBatchIsolated / splitOrGiveUp
+   * with every other bulk method, so a heavy or failing batch degrades exactly
+   * the way the rest of the client does.
+   *
+   * Callers MUST re-key on `githubId`, never on the node id they sent — the
+   * X-Github-Next-Global-ID header rewrites `id` on the way back, so a repo
+   * still stored under a legacy base64 id answers under its modern one.
+   */
+  async getRepoMetricsByNodeIds(nodeIds: string[]): Promise<RepoMetrics[]> {
+    const batches = chunk(nodeIds, GRAPHQL_BATCH_METRICS);
+    const results = await mapLimit(batches, this.concurrency, (batch) =>
+      this.fetchBatchIsolated(batch.length, () => this.fetchMetricsBatch(batch)),
+    );
+    return results.flat();
+  }
+
+  private async fetchMetricsBatch(ids: string[]): Promise<RepoMetrics[]> {
+    if (ids.length === 0) return [];
+    try {
+      const { data } = await this.graphql<GqlMetricsNodesResponse>(buildNodesMetricsQuery(), {
+        ids,
+      });
+      return (data?.nodes ?? [])
+        .filter((node): node is GqlRepoMetrics => isGqlRepoMetrics(node))
+        .map(toRepoMetrics);
+    } catch (error) {
+      return this.splitOrGiveUp(error, ids, (half) => this.fetchMetricsBatch(half));
     }
   }
 
@@ -800,11 +900,11 @@ export class GitHubClient {
    * sequentially. A single item that is still too heavy (a repo with a giant
    * README, say) is dropped rather than allowed to stall the whole sync.
    */
-  private async splitOrGiveUp<T>(
+  private async splitOrGiveUp<T, R>(
     error: unknown,
     items: T[],
-    run: (half: T[]) => Promise<GraphRepo[]>,
-  ): Promise<GraphRepo[]> {
+    run: (half: T[]) => Promise<R[]>,
+  ): Promise<R[]> {
     if (!(error instanceof GitHubTooHeavyError)) throw error;
     if (items.length <= 1) {
       console.warn(`[github] dropping 1 repo that GitHub could not serve: ${error.message}`);
