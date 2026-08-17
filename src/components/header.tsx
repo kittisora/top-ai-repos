@@ -78,11 +78,34 @@ export function Header({ starBadge }: { starBadge?: ReactNode }) {
                 className="flex shrink-0 items-center gap-2.5 tracking-tight"
               >
                 <Image
-                  src="/logo.png"
+                  src="/logo-68.png"
                   alt=""
                   width={34}
                   height={34}
                   /**
+                   * `unoptimized` + a pre-sized asset, NOT the on-demand optimizer.
+                   *
+                   * Pointed at the 589x589 /logo.png this emitted a srcSet of
+                   * `/_next/image?url=%2Flogo.png&w=48` (1x) and `&w=96` (2x). In
+                   * production the w=48 entry wedged inside the long-running Next
+                   * process — that one cache key hung forever, nginx gave up at its
+                   * 60s proxy_read_timeout, and every standard-DPI visitor got a
+                   * broken image while retina visitors on w=96 saw nothing wrong.
+                   * Every other width, and w=48 of other images, answered in
+                   * ~20-50ms, so it was a single poisoned key rather than a sick
+                   * optimizer. A restart cleared it; nothing stops it recurring,
+                   * because variants are held in RAM only (no .next/cache/images
+                   * on this host) and so are rebuilt on every deploy.
+                   *
+                   * Rather than chase the hang, take the logo off that path
+                   * entirely. It renders at a fixed 34px and never changes, so
+                   * dynamic optimization buys nothing: /logo-68.png is 68x68 (2x,
+                   * crisp on retina) and 5 KB, versus 50 KB of source the
+                   * optimizer was re-deriving the same two sizes from. `unoptimized`
+                   * makes Next emit a plain <img src="/logo-68.png"> served as a
+                   * static file. /logo.png stays where it is — the OG card
+                   * (src/app/opengraph-image.tsx) reads it off disk at full size.
+                   *
                    * `loading="eager"`, NOT `priority`.
                    *
                    * `priority` would also emit `fetchpriority="high"` plus a
@@ -94,6 +117,7 @@ export function Header({ starBadge }: { starBadge?: ReactNode }) {
                    * Eager still keeps it out of the lazy queue, so it paints with
                    * the header rather than popping in afterwards.
                    */
+                  unoptimized
                   loading="eager"
                   className="size-[34px] shrink-0 rounded-lg"
                 />
