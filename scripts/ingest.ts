@@ -6,6 +6,7 @@ import {
   classify,
   discover,
   enrichContributorProfiles,
+  refreshMetrics,
   score,
   snapshot,
   sync,
@@ -25,12 +26,20 @@ import { flag, main, numArg } from './cli';
  *   npm run ingest -- --days=2            only discover repos created recently (cheap)
  *   npm run ingest -- --skip-discover     refresh what we have, find nothing new
  *   npm run ingest -- --sync-limit=3000   push harder on metadata refresh
+ *   npm run ingest -- --metrics-limit=500 bound the full-table counter sweep
+ *   npm run ingest -- --skip-metrics      turn that sweep off entirely
  *   npm run ingest -- --profiles=0        skip the contributor-profile pass
+ *
+ * Note the asymmetry: `--profiles=0` and `--contributor-limit=0` DISABLE their
+ * stages, but `--metrics-limit=0` is the default and means "every active repo",
+ * because a bounded counter sweep is the special case rather than the norm.
+ * `--skip-metrics` is the off switch.
  *
  * Stage order is deliberate:
  *
  *   discover      new repos enter the index
  *   sync          refresh stars/readme/releases/owner location for known repos
+ *   metrics       stars/forks/issues/watchers for EVERY repo — see below
  *   snapshot      TODAY'S METRICS — runs early on purpose, see below
  *   countries     owner_location -> owner_country (needs sync; no API calls)
  *   contributors  top contributors per repo -> people + link rows
@@ -38,7 +47,19 @@ import { flag, main, numArg } from './cli';
  *   classify      categories, from the README sync just fetched
  *   score         last: it consumes the snapshot deltas and contributor data
  *
- * `snapshot` sits third rather than last because it is the ONE stage whose data
+ * `metrics` sits between `sync` and `snapshot` because sync cannot keep the star
+ * counts current on its own. Its deep enrichment only affords ~1,500 repos a
+ * run, so with 24.5k active repos a full rotation takes eight days, and
+ * `snapshot` records whatever star count happens to be on the row — which meant
+ * the stored history moved in one jump a week rather than daily. The metrics
+ * sweep re-reads only the four volatile counters over a dedicated lightweight
+ * GraphQL fragment (~491 queries and ~491 points for the whole table, ~16
+ * minutes measured), and therefore covers EVERY repo every run. It has to run
+ * after `sync` so it overwrites rather than is overwritten, and immediately
+ * before `snapshot` so the values being recorded are minutes old instead of
+ * days.
+ *
+ * `snapshot` sits fourth rather than last because it is the ONE stage whose data
  * cannot be recovered later — a missed day is gone forever. The stages after it
  * make thousands of GitHub calls and can sit in a rate-limit pause for a long
  * time; if the process died there, a late snapshot would have been lost with it.
@@ -77,6 +98,13 @@ await main(async () => {
       name: 'sync',
       skip: flag('skip-sync'),
       run: (log) => sync({ log, limit: numArg('sync-limit', 1_500) }),
+    },
+    {
+      // Cheap, full-table, and pointless anywhere but directly ahead of
+      // snapshot — that adjacency is the whole reason it exists.
+      name: 'metrics',
+      skip: flag('skip-metrics'),
+      run: (log) => refreshMetrics({ log, limit: numArg('metrics-limit', 0) }),
     },
     {
       // Irrecoverable if missed — see the note above on why this is not last.

@@ -75,6 +75,39 @@ fragment RepoMeta on Repository {
   }
 }`;
 
+/**
+ * The metrics-only shape: four volatile counters, plus the two ids needed to
+ * re-key the response onto our rows. Nothing else.
+ *
+ * This exists because RepoMeta is far too heavy for a sweep that writes four
+ * integers. RepoMeta drags `releases(first: 30)` and
+ * `repositoryTopics(first: 20)` behind every repo, so a 50-wide query resolves
+ * ~2,600 sub-nodes and lands squarely on the 9s client timeout: measured over
+ * 16 trials on this host, only 3 came back under the limit (TTFB 8.48-8.67s),
+ * 9 aborted and 4 drew a server 502/503. Every one of those failures halves the
+ * batch and retries, so the sweep silently ran at 25-wide and paid for release
+ * and topic data it discarded.
+ *
+ * The same 50 ids through this fragment answer in 2.09-2.31s at a cost of 1
+ * point (measured 2026-08-17), which is a quarter of the timeout budget rather
+ * than the whole of it.
+ *
+ * `databaseId` is NOT decoration. GitHub rewrites `id` to the modern global
+ * form on every response (see the X-Github-Next-Global-ID header in client.ts),
+ * so the node id that comes back is frequently not the one that was sent — the
+ * numeric id is the only stable join key. Dropping it here would silently break
+ * every caller's re-key.
+ */
+const REPO_METRICS_FRAGMENT = `
+fragment RepoMetrics on Repository {
+  id
+  databaseId
+  stargazerCount
+  forkCount
+  openIssues: issues(states: OPEN, first: 1) { totalCount }
+  watchers(first: 1) { totalCount }
+}`;
+
 const BLOB_FRAGMENT = `
 fragment BlobText on GitObject {
   ... on Blob { text isBinary isTruncated byteSize }
@@ -142,6 +175,29 @@ export function buildNodesQuery(includeReadme: boolean): string {
   rateLimit { cost limit remaining used resetAt }
 }
 ${fragments(includeReadme)}`;
+}
+
+/**
+ * The counters-only twin of buildNodesQuery, for the metrics sweep.
+ *
+ * A separate builder rather than a third mode on buildNodesQuery: that one's
+ * `includeReadme` boolean already selects between two fragment sets, and a
+ * second orthogonal flag would make the four combinations mean things nobody
+ * intends (metrics + readme being nonsense).
+ *
+ * `nodes(ids:)` is capped by GitHub at 100 ids per call — 101 is rejected
+ * outright with ARGUMENT_LIMIT, not truncated — so callers must batch below
+ * that regardless of how cheap the selection set is.
+ */
+export function buildNodesMetricsQuery(): string {
+  return `query RepoMetricsByNodeIds($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    __typename
+    ... on Repository { ...RepoMetrics }
+  }
+  rateLimit { cost limit remaining used resetAt }
+}
+${REPO_METRICS_FRAGMENT}`;
 }
 
 /* ------------------------------------------------------------------ *
@@ -213,6 +269,22 @@ export interface GqlAliasedRepoResponse {
 
 export interface GqlNodesResponse {
   nodes: (GqlRepo | null)[] | null;
+  rateLimit?: GqlRateLimit | null;
+}
+
+/** The RepoMetrics fragment's raw shape — a strict subset of GqlRepo. */
+export interface GqlRepoMetrics {
+  __typename?: string;
+  id: string;
+  databaseId: number | null;
+  stargazerCount: number;
+  forkCount: number;
+  openIssues: { totalCount: number } | null;
+  watchers: { totalCount: number } | null;
+}
+
+export interface GqlMetricsNodesResponse {
+  nodes: (GqlRepoMetrics | null)[] | null;
   rateLimit?: GqlRateLimit | null;
 }
 

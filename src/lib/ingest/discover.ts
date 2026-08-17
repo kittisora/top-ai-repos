@@ -239,7 +239,32 @@ export async function upsertDiscovered(
           stars: sql`excluded.stars`,
           forks: sql`excluded.forks`,
           openIssues: sql`excluded.open_issues`,
-          watchers: sql`excluded.watchers`,
+          /**
+           * `watchers` is deliberately NOT refreshed here.
+           *
+           * REST's `watchers_count` is not a watcher count — it is a second
+           * copy of `stargazers_count` (verified live: tensorflow/tensorflow
+           * reports 196,970 for both, while its real subscriber count is
+           * 7,502). The genuine figure is `subscribers_count`, which the search
+           * API does not return at all, so this path has no way to know it.
+           *
+           * Overwriting on every re-encounter would therefore replace the
+           * correct GraphQL value (`watchers(first:1){totalCount}`, written by
+           * sync and by the metrics sweep) with the star count — which the
+           * metrics sweep then has to write back, at the cost of a non-HOT
+           * update across all 16 indexes for a repo whose counters never moved.
+           * Leaving the stored value alone breaks that loop.
+           *
+           * A brand-new repo still takes the wrong value on INSERT, because the
+           * column is NOT NULL and this is all the search API offers; metrics
+           * corrects it later in the same pipeline run.
+           *
+           * `open_issues` is left refreshed above despite a similar dissonance
+           * (REST counts issues AND pull requests, GraphQL's
+           * `issues(states: OPEN)` excludes PRs). That one is a difference of
+           * definition rather than a wrong number, and REST is the only source
+           * on this path.
+           */
           sizeKb: sql`excluded.size_kb`,
           defaultBranch: sql`excluded.default_branch`,
           isFork: sql`excluded.is_fork`,

@@ -170,3 +170,24 @@ export interface SearchOptions {
 export interface BulkFetchOptions {
   includeReadme?: boolean;
 }
+
+/**
+ * The four volatile counters, and the ids needed to attribute them to a row.
+ *
+ * Deliberately NOT a Partial<GraphRepo>: this is what the metrics-only query
+ * can actually answer, and typing it as its own shape means a caller cannot
+ * reach for a field (language, topics, readme) that was never requested and
+ * silently get undefined.
+ *
+ * `githubId` is the join key, not `nodeId` — see RepoMetrics' fragment comment.
+ * It is nullable only because GitHub's schema declares `databaseId` nullable;
+ * in practice every repository has one.
+ */
+export interface RepoMetrics {
+  nodeId: string;
+  githubId: number | null;
+  stars: number;
+  forks: number;
+  openIssues: number;
+  watchers: number;
+}
